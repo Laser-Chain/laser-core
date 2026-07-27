@@ -35,7 +35,7 @@ $sourceCommit = (& git -C $SourceRoot rev-parse HEAD | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -or -not $sourceCommit) {
   throw 'Unable to resolve the Laser node source commit.'
 }
-$sourceStatus = @(& git -C $SourceRoot status --porcelain --untracked-files=no -- . ':(exclude)laser-core')
+$sourceStatus = @(& git -C $SourceRoot status --porcelain --untracked-files=no -- src include apps vendor components Makefile)
 if ($LASTEXITCODE -ne 0) { throw 'Unable to inspect the Laser node source worktree.' }
 $sourceDirty = $sourceStatus.Count -gt 0
 
