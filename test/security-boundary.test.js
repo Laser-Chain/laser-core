@@ -25,7 +25,8 @@ test('public package excludes development HTTP and external explorer surfaces', 
     enableNodeOptionsEnvironmentVariable: false,
     enableNodeCliInspectArguments: false,
     enableEmbeddedAsarIntegrityValidation: true,
-    onlyLoadAppFromAsar: true
+    onlyLoadAppFromAsar: true,
+    grantFileProtocolExtraPrivileges: false
   });
 });
 

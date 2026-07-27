@@ -17,8 +17,9 @@ The audit found and fixed release-boundary weaknesses before this candidate:
   process before they become CLI arguments;
 - optional explorer publishing now requires HTTPS and an existing configured
   helper, with bounded scheduling and no sibling-project discovery; and
-- Electron fuses disable Node-mode and debug environment entry points while
-  enforcing ASAR integrity and ASAR-only application loading.
+- Electron fuses disable Node-mode, debug environment entry points, and legacy
+  file-protocol privileges while enforcing ASAR integrity and ASAR-only
+  application loading.
 
 ## Scope and checks
 

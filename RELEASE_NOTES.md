@@ -34,7 +34,8 @@ runtime whose binaries do not match its checked build identity.
   independently validates wallet names, mining counts, addresses, amounts,
   and fees before constructing CLI arguments.
 - Electron runtime fuses disable RunAsNode, NODE_OPTIONS, and inspector CLI
-  arguments and require ASAR integrity and ASAR-only application loading.
+  arguments and legacy file-protocol privileges, and require ASAR integrity
+  and ASAR-only application loading.
 - Wallet passphrases remain off command lines and environment variables and are
   zeroed from the bounded in-memory secret store on lock or expiry.
 
