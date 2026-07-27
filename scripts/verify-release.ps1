@@ -68,7 +68,7 @@ foreach ($line in Get-Content -LiteralPath (Join-Path $directory 'BUILDINFO.txt'
 $requiredKeys = @(
   'format', 'app_version', 'source_commit', 'source_dirty', 'platform',
   'package_target', 'laser_version', 'laserd_version', 'project_license',
-  'authenticode_status'
+  'authenticode_status', 'cuda_miner_sha256'
 )
 foreach ($key in $requiredKeys) {
   if (-not $buildInfo.ContainsKey($key) -or -not $buildInfo[$key]) {
@@ -83,6 +83,10 @@ if ($buildInfo.format -ne 'laser-core-release-v1' -or
 }
 if ($executables[0].Name -ne "Laser-Core-$($buildInfo.app_version)-portable-x64.exe") {
   throw 'Executable filename does not match BUILDINFO.txt.'
+}
+if ($buildInfo.cuda_miner_sha256 -ne 'absent' -and
+    $buildInfo.cuda_miner_sha256 -notmatch '^[0-9a-f]{64}$') {
+  throw 'Invalid CUDA miner identity.'
 }
 if ($buildInfo.source_dirty -eq 'true' -and -not $AllowDirty) {
   throw 'Dirty-worktree candidates are not publishable.'

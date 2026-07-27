@@ -48,7 +48,7 @@ if ($laserVersion -notmatch '^Laser (.+)$' -or $laserdVersion -ne "laserd $($Mat
   throw "Staged node runtime versions do not match: $laserVersion / $laserdVersion"
 }
 
-@(
+$buildInfo = @(
   'channel=v3'
   "source_commit=$sourceCommit"
   "source_dirty=$($sourceDirty.ToString().ToLowerInvariant())"
@@ -60,6 +60,12 @@ if ($laserVersion -notmatch '^Laser (.+)$' -or $laserdVersion -ne "laserd $($Mat
   "laser_sha256=$((Get-FileHash -LiteralPath $laser -Algorithm SHA256).Hash.ToLowerInvariant())"
   "laserd_sha256=$((Get-FileHash -LiteralPath $laserd -Algorithm SHA256).Hash.ToLowerInvariant())"
   "laser_shadow_sha256=$((Get-FileHash -LiteralPath $shadow -Algorithm SHA256).Hash.ToLowerInvariant())"
-) | Set-Content -LiteralPath (Join-Path $output 'BUILDINFO.txt') -Encoding ascii
+)
+if (Test-Path -LiteralPath $cudaOutput -PathType Leaf) {
+  $buildInfo += "laser_cuda_miner_sha256=$((Get-FileHash -LiteralPath $cudaOutput -Algorithm SHA256).Hash.ToLowerInvariant())"
+} else {
+  $buildInfo += 'laser_cuda_miner_sha256=absent'
+}
+$buildInfo | Set-Content -LiteralPath (Join-Path $output 'BUILDINFO.txt') -Encoding ascii
 
 Write-Output "Staged Laser v3 runtime in $output"

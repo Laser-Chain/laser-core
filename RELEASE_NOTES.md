@@ -12,7 +12,8 @@ use it to hold assets of value.
 - Preserved sandbox compatibility runtime: pinned source commit and binary
   hashes recorded in BUILDINFO.txt.
 - Optional CUDA mining helper when present; CPU consensus verification remains
-  authoritative and CPU-only operation remains supported.
+  authoritative and CPU-only operation remains supported. Its individual
+  SHA-256 identity is recorded with the other native runtimes.
 
 The release builder rejects mismatched CLI/daemon versions and a sandbox
 runtime whose binaries do not match its checked build identity.

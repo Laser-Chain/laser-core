@@ -81,6 +81,15 @@ try {
   $sourceCommit = (& git -C $AppRepoRoot rev-parse HEAD | Out-String).Trim()
   $sourceDate = (& git -C $AppRepoRoot show -s --format=%cI HEAD | Out-String).Trim()
   $v3Info = Read-KeyValueFile (Join-Path $v3Dir 'BUILDINFO.txt')
+  $cudaMiner = Join-Path $v3Dir 'laser-cuda-miner.exe'
+  $cudaMinerIdentity = if (Test-Path -LiteralPath $cudaMiner -PathType Leaf) {
+    (Get-FileHash -LiteralPath $cudaMiner -Algorithm SHA256).Hash.ToLowerInvariant()
+  } else {
+    'absent'
+  }
+  if ($cudaMinerIdentity -ne $v3Info.laser_cuda_miner_sha256) {
+    throw 'The optional CUDA runtime does not match v3 BUILDINFO.txt.'
+  }
 
   $sandboxDir = Join-Path $AppDir '.runtime\sandbox-v2'
   $sandboxInfoPath = Join-Path $sandboxDir 'BUILDINFO.txt'
@@ -152,6 +161,7 @@ try {
     "laserd_version=$laserdVersion"
     "node_source_commit=$($v3Info.source_commit)"
     "node_source_dirty=$($v3Info.source_dirty)"
+    "cuda_miner_sha256=$cudaMinerIdentity"
     'default_network=shadow'
     'wire_protocol=3'
     'block_store_version=3'
