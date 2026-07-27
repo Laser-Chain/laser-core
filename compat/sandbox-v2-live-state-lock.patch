@@ -1,0 +1,36 @@
+diff --git a/apps/cli/main.c b/apps/cli/main.c
+index c310ec0..1642dd3 100644
+--- a/apps/cli/main.c
++++ b/apps/cli/main.c
+@@ -30,6 +30,7 @@
+ #include "sim.h"
+ #include "util.h"
+ #include "block_store.h"
++#include "datadir_lock.h"
+ #include "net.h"
+ #include "network.h"
+ #include "peer.h"
+@@ -302,7 +303,15 @@ static int cmd_v2_status(int argc, char **argv, int sync_only)
+         return 0;
+     }
++    laser_datadir_lock_t data_lock;
++    if (laser_datadir_lock_acquire(&data_lock, options.data_dir) != 0) {
++        fprintf(stderr, "Data directory is in use; query the running node "
++                "with --rpc HOST:PORT\n");
++        return 1;
++    }
+     const laser_network_t *network;
+     laser_block_store_t store;
+     laser_tx_pool_t pool;
+-    if (open_v2_state(&options, &network, &store, &pool) != 0)
++    if (open_v2_state(&options, &network, &store, &pool) != 0) {
++        laser_datadir_lock_release(&data_lock);
+         return 1;
++    }
+@@ -354,5 +363,6 @@ static int cmd_v2_status(int argc, char **argv, int sync_only)
+     }
+     laser_tx_pool_free(&pool);
+     laser_block_store_free(&store);
++    laser_datadir_lock_release(&data_lock);
+     return 0;
+ }

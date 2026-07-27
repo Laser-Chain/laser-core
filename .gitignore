@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.runtime/
+wallets/
+/server.js
+/public/
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+Thumbs.db
+.DS_Store

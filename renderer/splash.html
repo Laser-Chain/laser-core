@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+  <title>Laser Core</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      width: 480px;
+      height: 320px;
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+      background: #f0f0f0;
+      display: flex;
+      user-select: none;
+      -webkit-app-region: drag;
+    }
+
+    .splash-left {
+      width: 200px;
+      height: 320px;
+      background: #3a3a3a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .logo-img {
+      width: 260px;
+      height: 260px;
+      object-fit: contain;
+      opacity: 1;
+      transform: none;
+    }
+
+    .splash-right {
+      flex: 1;
+      padding: 40px 30px 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .splash-header {
+      opacity: 1;
+    }
+
+    .title {
+      font-size: 28px;
+      font-weight: 700;
+      color: #1a1a1a;
+      line-height: 1.1;
+    }
+
+    .splash-footer {
+      opacity: 1;
+    }
+
+    .status-text {
+      font-size: 11px;
+      color: #666;
+      margin-bottom: 6px;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 4px;
+      background: #d0d0d0;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: #3c3c3c;
+      border-radius: 2px;
+      animation: progressGrow 3.5s ease-in-out forwards;
+    }
+
+    @keyframes progressGrow {
+      0%   { width: 0%; }
+      15%  { width: 15%; }
+      30%  { width: 25%; }
+      50%  { width: 50%; }
+      70%  { width: 70%; }
+      85%  { width: 85%; }
+      100% { width: 100%; }
+    }
+
+    /* Match the refined Qt-inspired application shell. */
+    body {
+      font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+      color: #242424;
+      background: #e7e7e7;
+      border: 1px solid #888;
+    }
+
+    .splash-left {
+      width: 190px;
+      background: linear-gradient(145deg, #303030 0%, #151515 100%);
+      border-right: 1px solid #0c0c0c;
+      box-shadow: inset -1px 0 0 rgba(255,255,255,0.08);
+    }
+
+    .splash-left::after {
+      display: none;
+    }
+
+    .logo-img {
+      position: absolute;
+      top: -92px;
+      left: -82px;
+      width: 330px;
+      height: 330px;
+      max-width: none;
+      filter: grayscale(1) contrast(1.08) drop-shadow(0 8px 18px rgba(0,0,0,0.38));
+      transform-origin: top left;
+    }
+
+    .splash-right {
+      padding: 35px 28px 22px;
+      background: linear-gradient(180deg, #f5f5f5 0%, #dfdfdf 100%);
+    }
+
+    .title {
+      margin-top: 3px;
+      color: #202020;
+      font-size: 27px;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+    }
+
+    .status-text {
+      color: #555;
+      font-size: 11px;
+    }
+
+    .progress-track {
+      height: 5px;
+      background: #c7c7c7;
+      border: 1px solid #aaa;
+      border-radius: 1px;
+      box-shadow: inset 0 1px 2px rgba(23,33,43,0.1);
+    }
+
+    .progress-fill {
+      background: linear-gradient(180deg, #555 0%, #292929 100%);
+      border-radius: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="splash-left">
+    <img src="logo.png" class="logo-img" alt="Laser">
+  </div>
+  <div class="splash-right">
+    <div class="splash-header">
+      <div class="title">Laser Core</div>
+    </div>
+    <div class="splash-footer">
+      <div class="status-text" id="splash-status">Starting node…</div>
+      <div class="progress-track">
+        <div class="progress-fill" id="splash-progress"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="splash.js"></script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+Laser Core 0.2.0-beta.1
+
+Laser Core is experimental testnet software. It is not intended to hold assets
+of value, and its network and storage formats may reset or change.
+
+No project-wide license grant has been finalized for Laser's first-party
+source. The package metadata therefore uses UNLICENSED. Distribution of a
+release artifact must not be described as MIT-licensed unless the repository
+owner first adopts and commits an applicable project license.
+
+Bundled components retain their own terms:
+
+- Electron: MIT license. Electron's license and Chromium's third-party license
+  notices are embedded in the packaged runtime as LICENSE.electron.txt and
+  LICENSES.chromium.html.
+- PhotonHash: MIT license; see components/photonhash/LICENSE in the source
+  repository.
+- The ML-DSA implementation is derived from the pq-crystals Dilithium
+  reference sources under Apache-2.0 terms; see the vendored source notices in
+  the source repository.
+
+Source and security policy:
+https://github.com/photonicmoney/laser

@@ -1,0 +1,187 @@
+diff --git a/include/peer_book.h b/include/peer_book.h
+index a86b4f0..73acf8b 100644
+--- a/include/peer_book.h
++++ b/include/peer_book.h
+@@ -18,6 +18,8 @@ int laser_peer_book_open(laser_peer_book_t *book,
+                          const laser_network_t *network,
+                          const char *data_dir);
+ int laser_peer_endpoint_valid(const char *endpoint);
++int laser_peer_endpoint_discoverable(const char *endpoint,
++                                     const char *source_address);
+ int laser_peer_book_add(laser_peer_book_t *book, const char *endpoint);
+ int laser_peer_book_flush(const laser_peer_book_t *book);
+ 
+diff --git a/src/block_store.c b/src/block_store.c
+index 960fa6a..30eac6a 100644
+--- a/src/block_store.c
++++ b/src/block_store.c
+@@ -79,6 +79,15 @@ static size_t find_entry(const laser_block_store_t *store,
+     return NO_PARENT;
+ }
+ 
++static int find_orphan(const laser_block_store_t *store,
++                       const uint8_t hash[32])
++{
++    for (size_t i = 0; i < store->orphan_count; i++)
++        if (memcmp(store->orphans[i].hash, hash, 32) == 0)
++            return 1;
++    return 0;
++}
++
+ static int copy_block(laser_block_t *dst, const laser_block_t *src)
+ {
+     laser_block_init(dst);
+@@ -272,6 +281,8 @@ static laser_store_result_t accept_internal(
+     laser_block_hash(hash, &block->header);
+     if (find_entry(store, hash) != NO_PARENT)
+         return LASER_STORE_DUPLICATE;
++    if (find_orphan(store, hash))
++        return LASER_STORE_DUPLICATE;
+     parent_index = find_entry(store, block->header.prev_hash);
+     if (parent_index == NO_PARENT) {
+         if (add_orphan(store, block, hash) != 0)
+diff --git a/src/mesh.c b/src/mesh.c
+index 67e440d..32f1608 100644
+--- a/src/mesh.c
++++ b/src/mesh.c
+@@ -434,7 +434,8 @@ static int queue_peers(laser_mesh_t *mesh, mesh_peer_t *peer,
+     uint32_t count = 0;
+     const char *endpoint = mesh->listen_endpoint;
+     size_t length = strlen(endpoint);
+-    if (length > 0 && length <= LASER_PEER_ENDPOINT_MAX) {
++    if (length > 0 && length <= LASER_PEER_ENDPOINT_MAX &&
++        laser_peer_endpoint_discoverable(endpoint, peer->address)) {
+         payload[offset++] = (uint8_t)length;
+         memcpy(payload + offset, endpoint, length);
+         offset += length;
+@@ -445,6 +446,8 @@ static int queue_peers(laser_mesh_t *mesh, mesh_peer_t *peer,
+         endpoint = mesh->book.endpoints[i];
+         if (strcmp(endpoint, mesh->listen_endpoint) == 0)
+             continue;
++        if (!laser_peer_endpoint_discoverable(endpoint, peer->address))
++            continue;
+         length = strlen(endpoint);
+         payload[offset++] = (uint8_t)length;
+         memcpy(payload + offset, endpoint, length);
+@@ -765,8 +768,11 @@ static int handle_block(laser_mesh_t *mesh, mesh_peer_t *peer,
+     laser_block_free(&block);
+     if (result == LASER_STORE_ORPHAN)
+         return request_parent(mesh, peer, parent);
+-    if (result == LASER_STORE_DUPLICATE)
++    if (result == LASER_STORE_DUPLICATE) {
++        if (!laser_block_store_contains(mesh->store, hash))
++            return request_parent(mesh, peer, parent);
+         return 0;
++    }
+     if (result != LASER_STORE_ACCEPTED)
+         return result == LASER_STORE_INVALID ?
+                MESH_INVALID_ERROR : MESH_IO_ERROR;
+@@ -811,7 +817,9 @@ static int handle_peer_list(laser_mesh_t *mesh, mesh_peer_t *peer,
+         offset += length;
+         if (!laser_peer_endpoint_valid(endpoint))
+             return MESH_PROTOCOL_ERROR;
+-        if (i == 0)
++        if (!laser_peer_endpoint_discoverable(endpoint, peer->address))
++            continue;
++        if (peer->advertised_endpoint[0] == '\0')
+             memcpy(peer->advertised_endpoint, endpoint, length + 1u);
+         if (strcmp(endpoint, mesh->listen_endpoint) == 0)
+             continue;
+diff --git a/src/peer_book.c b/src/peer_book.c
+index 8f69bb4..59886aa 100644
+--- a/src/peer_book.c
++++ b/src/peer_book.c
+@@ -2,6 +2,7 @@
+ 
+ #include "util.h"
+ 
++#include <ctype.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -45,6 +46,50 @@ int laser_peer_endpoint_valid(const char *endpoint)
+     return 1;
+ }
+ 
++static int ascii_equal_ignore_case(const char *left, const char *right)
++{
++    while (*left && *right) {
++        if (tolower((unsigned char)*left) !=
++            tolower((unsigned char)*right))
++            return 0;
++        left++;
++        right++;
++    }
++    return *left == '\0' && *right == '\0';
++}
++
++static int host_is_loopback(const char *host)
++{
++    return strncmp(host, "127.", 4) == 0 ||
++           strcmp(host, "::1") == 0 ||
++           strcmp(host, "[::1]") == 0 ||
++           ascii_equal_ignore_case(host, "localhost");
++}
++
++static int host_is_unspecified(const char *host)
++{
++    return strcmp(host, "0.0.0.0") == 0 ||
++           strcmp(host, "::") == 0 ||
++           strcmp(host, "[::]") == 0;
++}
++
++int laser_peer_endpoint_discoverable(const char *endpoint,
++                                     const char *source_address)
++{
++    if (!laser_peer_endpoint_valid(endpoint) || !source_address)
++        return 0;
++    const char *colon = strrchr(endpoint, ':');
++    size_t host_length = (size_t)(colon - endpoint);
++    if (host_length == 0 || host_length > LASER_PEER_ENDPOINT_MAX)
++        return 0;
++    char host[LASER_PEER_ENDPOINT_MAX + 1u];
++    memcpy(host, endpoint, host_length);
++    host[host_length] = '\0';
++    if (host_is_unspecified(host))
++        return 0;
++    return !host_is_loopback(host) || host_is_loopback(source_address);
++}
++
+ int laser_peer_book_open(laser_peer_book_t *book,
+                          const laser_network_t *network,
+                          const char *data_dir)
+diff --git a/tests/test_block_store.c b/tests/test_block_store.c
+index 43d8369..faf2e80 100644
+--- a/tests/test_block_store.c
++++ b/tests/test_block_store.c
+@@ -90,6 +90,10 @@ int main(void)
+           "unknown-parent block classified as orphan");
+     CHECK(laser_block_store_orphan_count(&store) == 1,
+           "orphan retained in bounded pool");
++    CHECK(laser_block_store_accept(&store, &orphan, orphan.header.timestamp,
++                                   0, &validation) == LASER_STORE_DUPLICATE &&
++          laser_block_store_orphan_count(&store) == 1,
++          "duplicate orphan does not consume another pool slot");
+ 
+     laser_block_free(&a1);
+     laser_block_free(&b1);
+diff --git a/tests/test_control.c b/tests/test_control.c
+index 50189fd..2366674 100644
+--- a/tests/test_control.c
++++ b/tests/test_control.c
+@@ -65,6 +65,15 @@ int main(void)
+           "peer book deduplicates and persists an endpoint");
+     CHECK(laser_peer_book_add(&peers, "127.0.0.1:not-a-port") != 0,
+           "peer book rejects malformed ports");
++    CHECK(laser_peer_endpoint_discoverable("127.0.0.1:29200",
++                                           "127.0.0.1") &&
++          !laser_peer_endpoint_discoverable("127.0.0.1:29200",
++                                            "198.51.100.8") &&
++          !laser_peer_endpoint_discoverable("0.0.0.0:29200",
++                                            "127.0.0.1") &&
++          laser_peer_endpoint_discoverable("203.0.113.10:19444",
++                                           "198.51.100.8"),
++          "discovery keeps loopback local and rejects wildcard endpoints");
+     CHECK(laser_peer_book_open(&recovered, regtest, directory) == 0 &&
+           recovered.count == 1 &&
+           strcmp(recovered.endpoints[0], "127.0.0.1:29200") == 0,

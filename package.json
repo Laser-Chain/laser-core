@@ -1,0 +1,96 @@
+{
+  "name": "laser-core",
+  "version": "0.2.0-beta.1",
+  "description": "Laser Core - Desktop wallet and mining client for Laser Shadownet",
+  "author": "Lightman",
+  "private": true,
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/photonicmoney/laser-core.git"
+  },
+  "bugs": "https://github.com/photonicmoney/laser-core/issues",
+  "homepage": "https://github.com/photonicmoney/laser-core#readme",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "prepare:v3": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stage-v3.ps1",
+    "prepare:sandbox": "powershell -ExecutionPolicy Bypass -File scripts/build-sandbox-v2.ps1",
+    "dist:win": "electron-builder --win portable --x64",
+    "release:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-release.ps1",
+    "verify:release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-release.ps1",
+    "check": "node --check main.js && node --check explorer-publisher.js && node --check runtime-config.js && node --check preload.js && node --check splash-preload.js && node --check renderer/app.js && node --check renderer/splash.js",
+    "test": "node --test test/*.test.js && npm run check"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^43.1.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "org.laser.core",
+    "productName": "Laser Core",
+    "artifactName": "Laser-Core-${version}-portable-x64.exe",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "splash-preload.js",
+      "runtime-config.js",
+      "explorer-publisher.js",
+      "wallet-secret-store.js",
+      "wallet-files.js",
+      "renderer/**/*",
+      "NOTICE.txt",
+      "RELEASE_NOTES.md",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": ".runtime/sandbox-v2",
+        "to": "bin/sandbox-v2",
+        "filter": [
+          "laser.exe",
+          "laserd.exe",
+          "BUILDINFO.txt"
+        ]
+      },
+      {
+        "from": ".runtime/v3/laser.exe",
+        "to": "bin/v3/laser.exe"
+      },
+      {
+        "from": ".runtime/v3/laserd.exe",
+        "to": "bin/v3/laserd.exe"
+      },
+      {
+        "from": ".runtime/v3/laser-shadow.exe",
+        "to": "bin/v3/laser-shadow.exe"
+      },
+      {
+        "from": ".runtime/v3",
+        "to": "bin/v3",
+        "filter": [
+          "laser-cuda-miner.exe",
+          "BUILDINFO.txt"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "packaging/laser-core.ico",
+      "executableName": "Laser Core"
+    }
+  }
+}

@@ -1,0 +1,289 @@
+diff --git a/apps/cli/main.c b/apps/cli/main.c
+index c310ec0..6cdee51 100644
+--- a/apps/cli/main.c
++++ b/apps/cli/main.c
+@@ -72,6 +72,8 @@ static void print_usage(void)
+         "--datadir DIR\n"
+         "  laser node balance <wallet-or-address> --rpc HOST:PORT "
+         "--datadir DIR\n"
++        "  laser node miner <wallet-or-address> --rpc HOST:PORT "
++        "--datadir DIR [--json]\n"
+         "  laser node stop --rpc HOST:PORT --datadir DIR\n"
+         "  laser sync status --datadir DIR [--network NAME] [--json]\n"
+         "                                      Inspect persisted sync state\n"
+@@ -383,6 +385,75 @@ static int cmd_v2_balance(int argc, char **argv)
+     return 0;
+ }
+ 
++static int cmd_v2_miner(int argc, char **argv)
++{
++    if (argc < 4) {
++        fprintf(stderr, "Usage: laser node miner <wallet-or-address> "
++                "--rpc HOST:PORT --datadir DIR [--json]\n");
++        return 2;
++    }
++    v2_cli_options_t options;
++    if (parse_v2_options(&options, argc, argv, 4) != 0 ||
++        !options.rpc_endpoint)
++        return 2;
++    uint8_t address[32];
++    if (resolve_address(address, argv[3]) != 0)
++        return 1;
++    char encoded[65], command[80], response[768], extra;
++    hex_encode(encoded, address, 32);
++    snprintf(command, sizeof command, "MINER %s", encoded);
++    if (laser_rpc_request(options.rpc_endpoint, options.data_dir, command,
++                          response, sizeof response) != 0) {
++        fprintf(stderr, "Cannot query miner metrics\n");
++        return 1;
++    }
++    unsigned long long confirmed, projected, pending_received, pending_spent;
++    unsigned long long blocks, subsidy, fees, total, last_height;
++    unsigned long long last_timestamp, next_reward;
++    int has_last;
++    if (sscanf(response,
++               "confirmed=%llu projected=%llu pending_received=%llu "
++               "pending_spent=%llu blocks=%llu subsidy=%llu fees=%llu "
++               "total=%llu last_height=%llu last_timestamp=%llu "
++               "has_last=%d next_reward=%llu %c",
++               &confirmed, &projected, &pending_received, &pending_spent,
++               &blocks, &subsidy, &fees, &total, &last_height,
++               &last_timestamp, &has_last, &next_reward, &extra) != 12) {
++        fprintf(stderr, "Malformed miner metrics response\n");
++        return 1;
++    }
++    if (options.json) {
++        printf("{\042address\042:\042%s\042,"
++               "\042confirmed_photons\042:\042%llu\042,"
++               "\042projected_photons\042:\042%llu\042,"
++               "\042pending_received_photons\042:\042%llu\042,"
++               "\042pending_spent_photons\042:\042%llu\042,"
++               "\042blocks_mined\042:%llu,"
++               "\042subsidy_photons\042:\042%llu\042,"
++               "\042fee_photons\042:\042%llu\042,"
++               "\042total_mined_photons\042:\042%llu\042,"
++               "\042has_last\042:%s,"
++               "\042last_height\042:%llu,"
++               "\042last_timestamp\042:%llu,"
++               "\042next_reward_photons\042:\042%llu\042}\n",
++               encoded, confirmed, projected, pending_received, pending_spent,
++               blocks, subsidy, fees, total, has_last ? "true" : "false",
++               last_height, last_timestamp, next_reward);
++    } else {
++        printf("Address: %s\nBlocks mined: %llu\n"
++               "Total mined: %llu photons (%llu subsidy + %llu fees)\n"
++               "Confirmed: %llu photons\nProjected: %llu photons\n"
++               "Pending received: %llu photons\nPending spent: %llu photons\n",
++               encoded, blocks, total, subsidy, fees, confirmed, projected,
++               pending_received, pending_spent);
++        if (has_last)
++            printf("Last mined: height %llu timestamp %llu\n",
++                   last_height, last_timestamp);
++        printf("Next block subsidy: %llu photons\n", next_reward);
++    }
++    return 0;
++}
++
+ static int cmd_v2_send(int argc, char **argv)
+ {
+     if (argc < 6) {
+@@ -1141,6 +1212,10 @@ int main(int argc, char **argv)
+         strcmp(argv[2], "balance") == 0)
+         return cmd_v2_balance(argc, argv);
+ 
++    if (strcmp(cmd, "node") == 0 && argc >= 3 &&
++        strcmp(argv[2], "miner") == 0)
++        return cmd_v2_miner(argc, argv);
++
+     if (strcmp(cmd, "node") == 0 && argc >= 3 &&
+         strcmp(argv[2], "stop") == 0)
+         return cmd_v2_stop(argc, argv);
+diff --git a/apps/node/main.c b/apps/node/main.c
+index d987f3b..df8bad6 100644
+--- a/apps/node/main.c
++++ b/apps/node/main.c
+@@ -10,6 +10,7 @@
+ #include "mesh.h"
+ #include "peer_book.h"
+ #include "wallet.h"
++#include "emission.h"
+ #include "mldsa/randombytes.h"
+ #include "photonhash.h"
+ #include "util.h"
+@@ -201,12 +202,88 @@ static void print_peer(const char *direction, const laser_peer_t *peer)
+            direction, (unsigned long long)peer->remote.height, tip);
+ }
+ 
++typedef struct {
++    int valid;
++    uint8_t address[32];
++    uint8_t tip_hash[32];
++    uint64_t scanned_height;
++    uint64_t blocks;
++    uint64_t subsidy_photons;
++    uint64_t fee_photons;
++    uint64_t last_height;
++    uint64_t last_timestamp;
++    int has_last;
++} miner_metrics_cache_t;
++
++static int add_u64(uint64_t *total, uint64_t value)
++{
++    if (*total > UINT64_MAX - value)
++        return -1;
++    *total += value;
++    return 0;
++}
++
++static int miner_metrics_refresh(miner_metrics_cache_t *metrics,
++                                 const laser_block_store_t *store,
++                                 const uint8_t address[32])
++{
++    const laser_chain_tip_t *tip = laser_block_store_tip(store);
++    if (!metrics || !tip)
++        return -1;
++    miner_metrics_cache_t next;
++    uint64_t start = 0;
++    uint8_t active_hash[32];
++    if (metrics->valid && memcmp(metrics->address, address, 32) == 0 &&
++        metrics->scanned_height <= tip->height &&
++        laser_block_store_active_hash(store, metrics->scanned_height,
++                                      active_hash) == 0 &&
++        memcmp(active_hash, metrics->tip_hash, 32) == 0) {
++        next = *metrics;
++        start = metrics->scanned_height + 1;
++    } else {
++        memset(&next, 0, sizeof next);
++        memcpy(next.address, address, 32);
++    }
++    for (uint64_t height = start; height <= tip->height; height++) {
++        laser_block_t block;
++        if (laser_block_store_active_hash(store, height, active_hash) != 0 ||
++            laser_block_store_get_block(store, active_hash, &block) != 0)
++            return -1;
++        if (memcmp(block.header.miner_addr, address, 32) == 0) {
++            uint64_t fees = 0;
++            for (uint32_t i = 0; i < block.header.tx_count; i++) {
++                if (add_u64(&fees, block.txs[i].fee_photons) != 0) {
++                    laser_block_free(&block);
++                    return -1;
++                }
++            }
++            if (next.blocks == UINT64_MAX ||
++                add_u64(&next.subsidy_photons,
++                        laser_block_reward(height)) != 0 ||
++                add_u64(&next.fee_photons, fees) != 0) {
++                laser_block_free(&block);
++                return -1;
++            }
++            next.blocks++;
++            next.last_height = height;
++            next.last_timestamp = block.header.timestamp;
++            next.has_last = 1;
++        }
++        laser_block_free(&block);
++    }
++    next.valid = 1;
++    next.scanned_height = tip->height;
++    memcpy(next.tip_hash, tip->hash, 32);
++    *metrics = next;
++    return 0;
++}
++
+ static int handle_rpc(laser_socket_t socket_fd,
+                       const uint8_t token[LASER_RPC_TOKEN_LEN],
+                       const laser_network_t *network,
+                       laser_block_store_t *store,
+                       laser_tx_pool_t *tx_pool, laser_mesh_t *mesh,
+-                      int *stop)
++                      miner_metrics_cache_t *miner_metrics, int *stop)
+ {
+     char command[LASER_RPC_MAX_COMMAND + 1u];
+     if (laser_net_set_timeout(socket_fd, 3000) != 0 ||
+@@ -247,6 +324,68 @@ static int handle_rpc(laser_socket_t socket_fd,
+                  (unsigned long long)balance, (unsigned long long)nonce);
+         return laser_rpc_reply(socket_fd, 1, response);
+     }
++    if (strncmp(command, "MINER ", 6) == 0 &&
++        hex_validate(command + 6, 32) == 0) {
++        uint8_t address[32];
++        if (hex_decode(address, sizeof address, command + 6) != 0 ||
++            miner_metrics_refresh(miner_metrics, store, address) != 0)
++            return laser_rpc_reply(socket_fd, 0,
++                                   "miner metrics unavailable");
++        laser_ledger_t confirmed_ledger;
++        ledger_init(&confirmed_ledger);
++        if (laser_block_store_clone_active_ledger(
++                store, &confirmed_ledger) != 0)
++            return laser_rpc_reply(socket_fd, 0,
++                                   "confirmed balance unavailable");
++        const laser_account_t *confirmed = ledger_find(
++            &confirmed_ledger, address);
++        uint64_t confirmed_balance = confirmed ?
++            confirmed->balance_photons : 0;
++        ledger_free(&confirmed_ledger);
++        const laser_account_t *projected = ledger_find(
++            &tx_pool->overlay, address);
++        uint64_t pending_received = 0, pending_spent = 0;
++        for (size_t i = 0; i < tx_pool->count; i++) {
++            const laser_tx_t *transaction = &tx_pool->transactions[i];
++            if (memcmp(transaction->to_addr, address, 32) == 0 &&
++                add_u64(&pending_received,
++                        transaction->amount_photons) != 0)
++                return laser_rpc_reply(socket_fd, 0,
++                                       "pending receive overflow");
++            if (memcmp(transaction->from_addr, address, 32) == 0) {
++                uint64_t debit = transaction->amount_photons;
++                if (add_u64(&debit, transaction->fee_photons) != 0 ||
++                    add_u64(&pending_spent, debit) != 0)
++                    return laser_rpc_reply(socket_fd, 0,
++                                           "pending spend overflow");
++            }
++        }
++        uint64_t total = miner_metrics->subsidy_photons;
++        if (add_u64(&total, miner_metrics->fee_photons) != 0)
++            return laser_rpc_reply(socket_fd, 0,
++                                   "miner reward overflow");
++        char response[768];
++        snprintf(response, sizeof response,
++                 "confirmed=%llu projected=%llu pending_received=%llu "
++                 "pending_spent=%llu blocks=%llu subsidy=%llu fees=%llu "
++                 "total=%llu last_height=%llu last_timestamp=%llu "
++                 "has_last=%d next_reward=%llu",
++                 (unsigned long long)confirmed_balance,
++                 (unsigned long long)(projected ?
++                    projected->balance_photons : 0),
++                 (unsigned long long)pending_received,
++                 (unsigned long long)pending_spent,
++                 (unsigned long long)miner_metrics->blocks,
++                 (unsigned long long)miner_metrics->subsidy_photons,
++                 (unsigned long long)miner_metrics->fee_photons,
++                 (unsigned long long)total,
++                 (unsigned long long)miner_metrics->last_height,
++                 (unsigned long long)miner_metrics->last_timestamp,
++                 miner_metrics->has_last,
++                 (unsigned long long)laser_block_reward(
++                    laser_block_store_tip(store)->height + 1));
++        return laser_rpc_reply(socket_fd, 1, response);
++    }
+     if (strncmp(command, "SUBMIT ", 7) == 0 &&
+         hex_validate(command + 7, LASER_TX_SERIALIZED_LEN) == 0) {
+         uint8_t serialized[LASER_TX_SERIALIZED_LEN];
+@@ -384,6 +523,8 @@ static int run_persistent(const char *listen_endpoint,
+     fflush(stdout);
+     int stop = 0;
+     time_t last_mine_time = 0;
++    miner_metrics_cache_t miner_metrics;
++    memset(&miner_metrics, 0, sizeof miner_metrics);
+     while (!stop) {
+         if (laser_mesh_poll(mesh, 50) != 0)
+             break;
+@@ -396,7 +537,7 @@ static int run_persistent(const char *listen_endpoint,
+                 rpc_listener, NULL, 0, NULL);
+             if (socket_fd != LASER_INVALID_SOCKET) {
+                 (void)handle_rpc(socket_fd, token, network, store, tx_pool,
+-                                 mesh, &stop);
++                                 mesh, &miner_metrics, &stop);
+                 laser_net_close(socket_fd);
+             }
+         }
