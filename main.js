@@ -19,6 +19,12 @@ const {
   ExplorerPublisher,
   resolvePublisherConfig
 } = require('./explorer-publisher');
+const {
+  blockCount,
+  laserAddress,
+  laserValue,
+  MAX_PROTOCOL_PHOTONS
+} = require('./ipc-validation');
 
 // Configuration
 const runtime = resolveRuntime({
@@ -41,6 +47,8 @@ const LASER_PEERS = runtime.peers;
 const LASER_SHADOW_DIR = path.join(path.dirname(LASER_DATADIR), 'shadownet-evidence');
 const LASER_SHADOW_OUTPUT = path.join(LASER_SHADOW_DIR, 'laser-shadow.jsonl');
 const LASER_APP_ICON = path.join(__dirname, 'renderer', 'logo.png');
+const LASER_RENDERER_FILE = path.join(__dirname, 'renderer', 'index.html');
+const LASER_SPLASH_FILE = path.join(__dirname, 'renderer', 'splash.html');
 
 function hardenLocalWindow(window, expectedFile) {
   const expectedUrl = pathToFileURL(expectedFile).href;
@@ -48,6 +56,24 @@ function hardenLocalWindow(window, expectedFile) {
   window.webContents.on('will-navigate', (event, targetUrl) => {
     if (targetUrl !== expectedUrl) event.preventDefault();
   });
+}
+
+function registerTrustedIpcHandler(channel, expectedFile, listener) {
+  const expectedUrl = pathToFileURL(expectedFile).href;
+  ipcMain.handle(channel, (event, ...args) => {
+    if (!event.senderFrame || event.senderFrame.url !== expectedUrl) {
+      throw new Error('Rejected untrusted IPC sender.');
+    }
+    return listener(event, ...args);
+  });
+}
+
+function registerMainHandler(channel, listener) {
+  registerTrustedIpcHandler(channel, LASER_RENDERER_FILE, listener);
+}
+
+function registerSplashHandler(channel, listener) {
+  registerTrustedIpcHandler(channel, LASER_SPLASH_FILE, listener);
 }
 
 let mainWindow;
@@ -371,7 +397,6 @@ async function stopShadow() {
 // ── Window ─────────────────────────────────────────────────────
 
 function createWindow() {
-  const rendererFile = path.join(__dirname, 'renderer', 'index.html');
   mainWindow = new BrowserWindow({
     width: 960,
     height: 640,
@@ -426,8 +451,8 @@ function createWindow() {
   const menu = Menu.buildFromTemplate(menuTemplate);
   Menu.setApplicationMenu(menu);
 
-  hardenLocalWindow(mainWindow, rendererFile);
-  mainWindow.loadFile(rendererFile);
+  hardenLocalWindow(mainWindow, LASER_RENDERER_FILE);
+  mainWindow.loadFile(LASER_RENDERER_FILE);
 }
 
 function showBuildDetails(build) {
@@ -598,7 +623,7 @@ async function waitForNodeReady(timeoutMs = 90000) {
   return { ready: false, status: null, error: nodeStartupError };
 }
 
-ipcMain.handle('laser:startup', () => ({
+registerMainHandler('laser:startup', () => ({
   ready: nodeReady,
   error: nodeStartupError,
   stderr: nodeStderr,
@@ -609,7 +634,7 @@ ipcMain.handle('laser:startup', () => ({
   shadow: currentShadowState()
 }));
 
-ipcMain.handle('splash:identity', () => ({
+registerSplashHandler('splash:identity', () => ({
   appVersion: app.getVersion(),
   network: LASER_NETWORK,
   channel: runtime.channel,
@@ -617,7 +642,7 @@ ipcMain.handle('splash:identity', () => ({
   build: activeBuildIdentity()
 }));
 
-ipcMain.handle('laser:status', async () => {
+registerMainHandler('laser:status', async () => {
   const raw = await laserCmd([
     'node', 'status', '--rpc', LASER_RPC,
     '--datadir', LASER_DATADIR, '--network', LASER_NETWORK, '--json'
@@ -627,7 +652,7 @@ ipcMain.handle('laser:status', async () => {
   return { ...status, shadow: currentShadowState() };
 });
 
-ipcMain.handle('laser:peers', async () => {
+registerMainHandler('laser:peers', async () => {
   const raw = await laserCmd([
     'peer', 'list', '--rpc', LASER_RPC,
     '--datadir', LASER_DATADIR, '--network', LASER_NETWORK, '--json'
@@ -671,17 +696,17 @@ async function openWalletRecord(requestedName, passphrase, requireExisting) {
   return { name, address, balance_photons: balance, nonce };
 }
 
-ipcMain.handle('laser:wallet-list', () => listWallets(LASER_CWD));
+registerMainHandler('laser:wallet-list', () => listWallets(LASER_CWD));
 
-ipcMain.handle('laser:wallet-open', async (_event, name, passphrase) => {
+registerMainHandler('laser:wallet-open', async (_event, name, passphrase) => {
   return await openWalletRecord(name, passphrase, true);
 });
 
-ipcMain.handle('laser:wallet-create', async (_event, name, passphrase) => {
+registerMainHandler('laser:wallet-create', async (_event, name, passphrase) => {
   return await openWalletRecord(name, passphrase, false);
 });
 
-ipcMain.handle('laser:wallet-restore', async (_event, requestedName) => {
+registerMainHandler('laser:wallet-restore', async (_event, requestedName) => {
   const name = walletName(requestedName);
   if (fs.existsSync(walletFilePath(LASER_CWD, name))) {
     throw new Error('A wallet with that name already exists.');
@@ -707,18 +732,18 @@ ipcMain.handle('laser:wallet-restore', async (_event, requestedName) => {
   return { name };
 });
 
-ipcMain.handle('laser:wallet-unlocked', (_event, requestedName) => {
+registerMainHandler('laser:wallet-unlocked', (_event, requestedName) => {
   const name = walletName(requestedName);
   if (runtime.channel === 'sandbox-v2') return true;
   return walletSecrets.has(name);
 });
 
-ipcMain.handle('laser:wallet-exists', (_event, requestedName) => {
+registerMainHandler('laser:wallet-exists', (_event, requestedName) => {
   const name = walletName(requestedName);
   return fs.existsSync(walletFilePath(LASER_CWD, name));
 });
 
-ipcMain.handle('laser:copy-address', (_event, address) => {
+registerMainHandler('laser:copy-address', (_event, address) => {
   const normalized = String(address || '').trim().toLowerCase();
   if (!/^[0-9a-f]{64}$/.test(normalized)) {
     throw new Error('Only a valid Laser address can be copied.');
@@ -736,17 +761,18 @@ async function queryMinerMetrics(wallet) {
   return JSON.parse(raw);
 }
 
-ipcMain.handle('laser:miner-metrics', async (_event, wallet) => {
+registerMainHandler('laser:miner-metrics', async (_event, wallet) => {
   if (!wallet || !String(wallet).trim()) {
     throw new Error('Load a wallet before requesting miner metrics.');
   }
   return await queryMinerMetrics(String(wallet).trim());
 });
 
-ipcMain.handle('laser:mine', async (_event, wallet, count) => {
+registerMainHandler('laser:mine', async (_event, wallet, count) => {
   const name = walletName(wallet);
+  const requestedCount = blockCount(count);
   return await walletCommand([
-    'node', 'mine', name, String(count),
+    'node', 'mine', name, String(requestedCount),
     '--rpc', LASER_RPC, '--datadir', LASER_DATADIR, '--network', LASER_NETWORK
   ], name, 120000);
 });
@@ -777,7 +803,7 @@ function stopMiningForWallet(name) {
   mineNextRunAt = null;
 }
 
-ipcMain.handle('laser:wallet-lock', (_event, requestedName) => {
+registerMainHandler('laser:wallet-lock', (_event, requestedName) => {
   const name = walletName(requestedName);
   stopMiningForWallet(name);
   lockWalletSecret(name);
@@ -820,11 +846,11 @@ function miningStatus() {
   };
 }
 
-ipcMain.handle('laser:mine-start', async (_event, wallet, intervalMs) => {
+registerMainHandler('laser:mine-start', async (_event, wallet, intervalMs) => {
   if (!wallet || !String(wallet).trim()) {
     throw new Error('Load a wallet before auto-mining.');
   }
-  const requestedWallet = String(wallet).trim();
+  const requestedWallet = walletName(wallet);
   mineIntervalMs = Number.isInteger(intervalMs) && intervalMs >= 1000
     ? Math.min(intervalMs, 600000)
     : 10000;
@@ -887,7 +913,7 @@ ipcMain.handle('laser:mine-start', async (_event, wallet, intervalMs) => {
   return miningStatus();
 });
 
-ipcMain.handle('laser:mine-stop', async () => {
+registerMainHandler('laser:mine-stop', async () => {
   const wasMining = miningEnabled;
   miningEnabled = false;
   mineGeneration++;
@@ -904,21 +930,30 @@ ipcMain.handle('laser:mine-stop', async () => {
   return miningStatus();
 });
 
-ipcMain.handle('laser:mine-status', () => {
+registerMainHandler('laser:mine-status', () => {
   return miningStatus();
 });
 
-ipcMain.handle('laser:send', async (_event, from, to, amount, fee) => {
+registerMainHandler('laser:send', async (_event, from, to, amount, fee) => {
   const name = walletName(from);
+  const recipient = laserAddress(to);
+  const sendAmount = laserValue(amount, 'Amount', false);
+  const sendFee = fee === null || fee === undefined || String(fee).trim() === ''
+    ? null
+    : laserValue(fee, 'Fee', true);
+  if (sendAmount.photons + (sendFee ? sendFee.photons : 0n) >
+      MAX_PROTOCOL_PHOTONS) {
+    throw new Error('Amount and fee exceed the protocol maximum.');
+  }
   const args = [
-    'node', 'send', name, to, String(amount),
+    'node', 'send', name, recipient, sendAmount.text,
     '--rpc', LASER_RPC, '--datadir', LASER_DATADIR, '--network', LASER_NETWORK
   ];
-  if (fee) args.splice(5, 0, String(fee));
+  if (sendFee) args.splice(5, 0, sendFee.text);
   return await walletCommand(args, name);
 });
 
-ipcMain.handle('laser:config', () => {
+registerMainHandler('laser:config', () => {
   return {
     network: LASER_NETWORK,
     rpc: LASER_RPC,
@@ -935,7 +970,6 @@ ipcMain.handle('laser:config', () => {
 // ── App Lifecycle ──────────────────────────────────────────────
 
 function createSplash() {
-  const splashFile = path.join(__dirname, 'renderer', 'splash.html');
   splashWindow = new BrowserWindow({
     width: 480,
     height: 320,
@@ -955,8 +989,8 @@ function createSplash() {
     }
   });
 
-  hardenLocalWindow(splashWindow, splashFile);
-  splashWindow.loadFile(splashFile);
+  hardenLocalWindow(splashWindow, LASER_SPLASH_FILE);
+  splashWindow.loadFile(LASER_SPLASH_FILE);
 }
 
 app.whenReady().then(async () => {

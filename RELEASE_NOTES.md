@@ -28,7 +28,13 @@ runtime whose binaries do not match its checked build identity.
 - The distributable excludes the legacy unauthenticated development HTTP
   server and its web UI.
 - The optional explorer publisher no longer pulls an untracked sibling binary
-  into the public package.
+  into the public package, requires HTTPS, and fails closed when its helper is
+  absent or its configuration is malformed.
+- Privileged IPC accepts calls only from the expected local renderer and
+  independently validates wallet names, mining counts, addresses, amounts,
+  and fees before constructing CLI arguments.
+- Electron runtime fuses disable RunAsNode, NODE_OPTIONS, and inspector CLI
+  arguments and require ASAR integrity and ASAR-only application loading.
 - Wallet passphrases remain off command lines and environment variables and are
   zeroed from the bounded in-memory secret store on lock or expiry.
 
@@ -56,7 +62,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-release.ps1 `
 - Local candidates are not Authenticode-signed unless a release certificate is
   configured. Unsigned output is suitable for internal qualification, not a
   final Windows publication.
-- The dependency advisory lookup is a separate networked release check and is
-  not represented by the offline checksum verifier.
+- The 2026-07-27 dependency audit found zero production dependency
+  vulnerabilities. It reports 16 high-severity development-only findings in
+  electron-builder's transitive glob tooling. The latest electron-builder is
+  in use; npm's suggested remediation is a breaking forced downgrade. These
+  modules process repository-controlled build inputs and are not application
+  runtime dependencies.
 - There is no automatic update channel. Users must verify and install later
   candidates manually.

@@ -15,7 +15,8 @@ test('packaged publisher resolves the bundled explorer binary', () => {
       LASER_EXPLORER_TOKEN: 'secret'
     },
     appDir: 'C:\\app\\resources\\app.asar',
-    resourcesPath: 'C:\\app\\resources'
+    resourcesPath: 'C:\\app\\resources',
+    exists: candidate => candidate.includes(path.join('bin', 'explorer'))
   });
   assert.equal(
     config.lxe,
@@ -26,6 +27,38 @@ test('packaged publisher resolves the bundled explorer binary', () => {
       process.platform === 'win32' ? 'lxe.exe' : 'lxe'
     )
   );
+});
+
+test('publisher rejects plaintext endpoints and missing helper binaries', () => {
+  const base = {
+    LASER_EXPLORER_TOKEN: 'secret',
+    LXE_BIN: 'lxe'
+  };
+  assert.equal(resolvePublisherConfig({
+    env: { ...base, LASER_EXPLORER_URL: 'http://explorer.invalid/ingest' },
+    exists: () => true
+  }), null);
+  assert.equal(resolvePublisherConfig({
+    env: { ...base, LASER_EXPLORER_URL: 'https://explorer.invalid/ingest' },
+    exists: () => false
+  }), null);
+});
+
+test('publisher bounds its schedule and rejects non-numeric intervals', () => {
+  const options = {
+    env: {
+      LASER_EXPLORER_URL: 'https://explorer.invalid/ingest',
+      LASER_EXPLORER_TOKEN: 'secret',
+      LASER_EXPLORER_INTERVAL_MS: 'not-a-number',
+      LXE_BIN: 'lxe'
+    },
+    exists: () => true
+  };
+  assert.equal(resolvePublisherConfig(options).intervalMs, 10000);
+  options.env.LASER_EXPLORER_INTERVAL_MS = '1';
+  assert.equal(resolvePublisherConfig(options).intervalMs, 3000);
+  options.env.LASER_EXPLORER_INTERVAL_MS = '9999999';
+  assert.equal(resolvePublisherConfig(options).intervalMs, 600000);
 });
 
 test('snapshot builder exports the complete active chain and details tx blocks', async () => {

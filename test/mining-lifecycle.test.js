@@ -27,6 +27,6 @@ test('continuous mining is explicitly stoppable and cancels the daemon job', () 
   assert.match(mainSource, /automatic: false,\s+stoppable: true/);
   assert.match(
     mainSource,
-    /ipcMain\.handle\('laser:mine-stop'[\s\S]*?'node', 'mine-stop'/
+    /registerMainHandler\('laser:mine-stop'[\s\S]*?'node', 'mine-stop'/
   );
 });

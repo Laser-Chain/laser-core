@@ -15,6 +15,7 @@ function resolvePublisherConfig(options = {}) {
   const appDir = options.appDir || __dirname;
   const userData = options.userData || '';
   const resourcesPath = options.resourcesPath || '';
+  const exists = options.exists || fs.existsSync;
   const suffix = process.platform === 'win32' ? '.exe' : '';
   const fileConfig = [
     env.LASER_EXPLORER_CONFIG,
@@ -26,16 +27,23 @@ function resolvePublisherConfig(options = {}) {
   const candidates = [
     env.LXE_BIN,
     fileConfig.lxe,
-    resourcesPath && path.join(resourcesPath, 'bin', 'explorer', 'lxe' + suffix),
-    path.resolve(appDir, '..', '..', 'laser-explorer', 'build', `lxe${suffix}`)
+    resourcesPath && path.join(resourcesPath, 'bin', 'explorer', 'lxe' + suffix)
   ].filter(Boolean);
-  const lxe = candidates.find(candidate => fs.existsSync(candidate)) || candidates[0];
-  const intervalMs = Math.max(
-    3000,
-    Math.min(Number(fileConfig.interval_ms || env.LASER_EXPLORER_INTERVAL_MS || 10000), 600000)
+  const lxe = candidates.find(candidate => exists(candidate));
+  const requestedInterval = Number(
+    fileConfig.interval_ms || env.LASER_EXPLORER_INTERVAL_MS || 10000
   );
-  if (!url || !token) return null;
-  return { url, token, lxe, intervalMs };
+  const intervalMs = Number.isFinite(requestedInterval)
+    ? Math.max(3000, Math.min(requestedInterval, 600000))
+    : 10000;
+  if (!url || !token || !lxe) return null;
+  try {
+    const endpoint = new URL(url);
+    if (endpoint.protocol !== 'https:') return null;
+    return { url: endpoint.href, token, lxe, intervalMs };
+  } catch (_) {
+    return null;
+  }
 }
 
 function runLxe(binary, datadir, network, args, timeout = 60000) {

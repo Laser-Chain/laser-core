@@ -20,7 +20,7 @@
     "dist:win": "electron-builder --win portable --x64",
     "release:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-release.ps1",
     "verify:release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-release.ps1",
-    "check": "node --check main.js && node --check explorer-publisher.js && node --check runtime-config.js && node --check preload.js && node --check splash-preload.js && node --check renderer/app.js && node --check renderer/splash.js",
+    "check": "node --check main.js && node --check explorer-publisher.js && node --check ipc-validation.js && node --check runtime-config.js && node --check preload.js && node --check splash-preload.js && node --check renderer/app.js && node --check renderer/splash.js",
     "test": "node --test test/*.test.js && npm run check"
   },
   "dependencies": {},
@@ -33,6 +33,14 @@
     "productName": "Laser Core",
     "artifactName": "Laser-Core-${version}-portable-x64.exe",
     "asar": true,
+    "electronFuses": {
+      "runAsNode": false,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true
+    },
     "directories": {
       "output": "dist"
     },
@@ -42,6 +50,7 @@
       "splash-preload.js",
       "runtime-config.js",
       "explorer-publisher.js",
+      "ipc-validation.js",
       "wallet-secret-store.js",
       "wallet-files.js",
       "renderer/**/*",

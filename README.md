@@ -58,7 +58,7 @@ remain connected and continue validating Shadownet.
 The encrypted wallet file is normally stored at:
 
 ```text
-%APPDATA%\laser-core\wallets\<wallet-name>.key
+%APPDATA%\Laser Core\wallets\<wallet-name>.key
 ```
 
 Back up that `.key` file while Laser Core is closed. Keep the backup and its
@@ -89,9 +89,9 @@ Default Windows locations are:
 
 | Data | Location |
 | --- | --- |
-| Shadownet chain | `%APPDATA%\laser-core\shadownet` |
-| Encrypted wallets | `%APPDATA%\laser-core\wallets` |
-| Shadow evidence | `%APPDATA%\laser-core\shadownet-evidence` |
+| Shadownet chain | `%APPDATA%\Laser Core\shadownet` |
+| Encrypted wallets | `%APPDATA%\Laser Core\wallets` |
+| Shadow evidence | `%APPDATA%\Laser Core\shadownet-evidence` |
 
 Back up wallets before deleting application data. Never share wallet `.key`
 files, passphrases, or RPC tokens.
@@ -159,7 +159,8 @@ The release workflow stages exact node binaries under the ignored `.runtime/`
 directory, rejects version or hash mismatches, refuses dirty application
 source, runs the full test suite, and assembles the final directory atomically.
 
-See [RELEASE_NOTES.md](RELEASE_NOTES.md), [NOTICE.txt](NOTICE.txt), and
+See [RELEASE_NOTES.md](RELEASE_NOTES.md),
+[SECURITY_AUDIT.md](SECURITY_AUDIT.md), [NOTICE.txt](NOTICE.txt), and
 [SECURITY.md](SECURITY.md) before distributing or operating the beta.
 
 ## License status

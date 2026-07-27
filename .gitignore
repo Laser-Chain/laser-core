@@ -4,11 +4,16 @@ dist/
 wallets/
 /server.js
 /public/
+/explorer-publish.json
 .env
 .env.*
+.npmrc
 *.key
 *.pem
 *.p12
 *.pfx
+*.jks
+*.keystore
+*.secrets.json
 Thumbs.db
 .DS_Store
