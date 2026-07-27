@@ -1,4 +1,13 @@
-const { app, BrowserWindow, clipboard, ipcMain, Menu, session } = require('electron');
+const {
+  app,
+  BrowserWindow,
+  clipboard,
+  ipcMain,
+  Menu,
+  net,
+  protocol,
+  session
+} = require('electron');
 const { execFile, execFileSync, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -26,6 +35,21 @@ const {
   MAX_PROTOCOL_PHOTONS
 } = require('./ipc-validation');
 
+const LASER_RENDERER_SCHEME = 'laser-core';
+protocol.registerSchemesAsPrivileged([{
+  scheme: LASER_RENDERER_SCHEME,
+  privileges: {
+    standard: true,
+    secure: true,
+    bypassCSP: false,
+    allowServiceWorkers: false,
+    supportFetchAPI: false,
+    corsEnabled: false,
+    codeCache: false,
+    allowExtensions: false
+  }
+}]);
+
 // Configuration
 const runtime = resolveRuntime({
   appDir: __dirname,
@@ -47,19 +71,45 @@ const LASER_PEERS = runtime.peers;
 const LASER_SHADOW_DIR = path.join(path.dirname(LASER_DATADIR), 'shadownet-evidence');
 const LASER_SHADOW_OUTPUT = path.join(LASER_SHADOW_DIR, 'laser-shadow.jsonl');
 const LASER_APP_ICON = path.join(__dirname, 'renderer', 'logo.png');
-const LASER_RENDERER_FILE = path.join(__dirname, 'renderer', 'index.html');
-const LASER_SPLASH_FILE = path.join(__dirname, 'renderer', 'splash.html');
+const LASER_RENDERER_URL = 'laser-core://app/index.html';
+const LASER_SPLASH_URL = 'laser-core://app/splash.html';
+const LASER_RENDERER_RESOURCES = new Map([
+  ['/index.html', 'index.html'],
+  ['/splash.html', 'splash.html'],
+  ['/style.css', 'style.css'],
+  ['/app.js', 'app.js'],
+  ['/splash.js', 'splash.js'],
+  ['/logo.png', 'logo.png']
+]);
 
-function hardenLocalWindow(window, expectedFile) {
-  const expectedUrl = pathToFileURL(expectedFile).href;
+function registerRendererProtocol() {
+  protocol.handle(LASER_RENDERER_SCHEME, request => {
+    const requestUrl = new URL(request.url);
+    const fileName = requestUrl.host === 'app' &&
+      request.method === 'GET' &&
+      !requestUrl.search &&
+      !requestUrl.hash &&
+      LASER_RENDERER_RESOURCES.get(requestUrl.pathname);
+    if (!fileName) {
+      return new Response('Not found', {
+        status: 404,
+        headers: { 'content-type': 'text/plain; charset=utf-8' }
+      });
+    }
+    return net.fetch(pathToFileURL(
+      path.join(__dirname, 'renderer', fileName)
+    ).href);
+  });
+}
+
+function hardenLocalWindow(window, expectedUrl) {
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event, targetUrl) => {
     if (targetUrl !== expectedUrl) event.preventDefault();
   });
 }
 
-function registerTrustedIpcHandler(channel, expectedFile, listener) {
-  const expectedUrl = pathToFileURL(expectedFile).href;
+function registerTrustedIpcHandler(channel, expectedUrl, listener) {
   ipcMain.handle(channel, (event, ...args) => {
     if (!event.senderFrame || event.senderFrame.url !== expectedUrl) {
       throw new Error('Rejected untrusted IPC sender.');
@@ -69,11 +119,11 @@ function registerTrustedIpcHandler(channel, expectedFile, listener) {
 }
 
 function registerMainHandler(channel, listener) {
-  registerTrustedIpcHandler(channel, LASER_RENDERER_FILE, listener);
+  registerTrustedIpcHandler(channel, LASER_RENDERER_URL, listener);
 }
 
 function registerSplashHandler(channel, listener) {
-  registerTrustedIpcHandler(channel, LASER_SPLASH_FILE, listener);
+  registerTrustedIpcHandler(channel, LASER_SPLASH_URL, listener);
 }
 
 let mainWindow;
@@ -451,8 +501,8 @@ function createWindow() {
   const menu = Menu.buildFromTemplate(menuTemplate);
   Menu.setApplicationMenu(menu);
 
-  hardenLocalWindow(mainWindow, LASER_RENDERER_FILE);
-  mainWindow.loadFile(LASER_RENDERER_FILE);
+  hardenLocalWindow(mainWindow, LASER_RENDERER_URL);
+  mainWindow.loadURL(LASER_RENDERER_URL);
 }
 
 function showBuildDetails(build) {
@@ -989,12 +1039,13 @@ function createSplash() {
     }
   });
 
-  hardenLocalWindow(splashWindow, LASER_SPLASH_FILE);
-  splashWindow.loadFile(LASER_SPLASH_FILE);
+  hardenLocalWindow(splashWindow, LASER_SPLASH_URL);
+  splashWindow.loadURL(LASER_SPLASH_URL);
 }
 
 app.whenReady().then(async () => {
   app.setAppUserModelId('org.laser.core');
+  registerRendererProtocol();
   session.defaultSession.setPermissionRequestHandler(
     (_webContents, _permission, callback) => callback(false)
   );

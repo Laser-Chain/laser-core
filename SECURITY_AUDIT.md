@@ -19,7 +19,8 @@ The audit found and fixed release-boundary weaknesses before this candidate:
   helper, with bounded scheduling and no sibling-project discovery; and
 - Electron fuses disable Node-mode, debug environment entry points, and legacy
   file-protocol privileges while enforcing ASAR integrity and ASAR-only
-  application loading.
+  application loading. Renderer pages use a fixed-resource custom protocol
+  without fetch, service-worker, or CSP-bypass privileges.
 
 ## Scope and checks
 

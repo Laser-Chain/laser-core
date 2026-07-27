@@ -45,9 +45,17 @@ test('renderer stays local, sandboxed, and protected by CSP', () => {
   const splash = read('renderer/splash.html');
 
   assert.match(main, /sandbox:\s*true/g);
+  assert.match(main, /protocol\.registerSchemesAsPrivileged/);
+  assert.match(main, /protocol\.handle\(LASER_RENDERER_SCHEME/);
+  assert.match(main, /LASER_RENDERER_RESOURCES = new Map/);
+  assert.match(main, /mainWindow\.loadURL\(LASER_RENDERER_URL\)/);
+  assert.doesNotMatch(main, /\.loadFile\(/);
   assert.match(main, /setWindowOpenHandler\(\(\) => \(\{ action: 'deny' \}\)\)/);
   assert.match(main, /setPermissionRequestHandler/);
   assert.match(main, /Rejected untrusted IPC sender/);
+  assert.match(main, /allowServiceWorkers: false/);
+  assert.match(main, /supportFetchAPI: false/);
+  assert.match(main, /bypassCSP: false/);
   assert.match(index, /Content-Security-Policy/);
   assert.match(splash, /Content-Security-Policy/);
   assert.doesNotMatch(index, /https?:\/\//);
