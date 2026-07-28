@@ -54,41 +54,30 @@ test('publisher bounds its schedule and rejects non-numeric intervals', () => {
     },
     exists: () => true
   };
-  assert.equal(resolvePublisherConfig(options).intervalMs, 10000);
+  assert.equal(resolvePublisherConfig(options).intervalMs, 3000);
   options.env.LASER_EXPLORER_INTERVAL_MS = '1';
   assert.equal(resolvePublisherConfig(options).intervalMs, 3000);
   options.env.LASER_EXPLORER_INTERVAL_MS = '9999999';
   assert.equal(resolvePublisherConfig(options).intervalMs, 600000);
 });
 
-test('snapshot builder exports the complete active chain and details tx blocks', async () => {
+test('snapshot builder exports the complete chain with one helper invocation', async () => {
   const calls = [];
+  const expected = {
+    schema: 1,
+    generated_at: 123,
+    tip: { network: 'shadow', height: 2, tip: 'tip-2' },
+    blocks: [
+      { height: 2, hash: 'tip-2', transactions: [] },
+      { height: 1, hash: 'block-1', transactions: [{ nonce: 0 }] },
+      { height: 0, hash: 'genesis', transactions: [] }
+    ],
+    accounts: { count: 1, accounts: [] },
+    economics: { tip_height: 2 }
+  };
   const run = async (_binary, _datadir, _network, args) => {
     calls.push(args);
-    if (args[0] === 'tip') {
-      return { network: 'shadow', height: 2, tip: 'tip-2' };
-    }
-    if (args[0] === 'blocks') {
-      return {
-        height: 2,
-        blocks: [
-          { height: 2, hash: 'tip-2', tx_count: 0 },
-          { height: 1, hash: 'block-1', tx_count: 1 },
-          { height: 0, hash: 'genesis', tx_count: 0 }
-        ]
-      };
-    }
-    if (args[0] === 'block') {
-      return {
-        height: 1,
-        hash: 'block-1',
-        tx_count: 1,
-        transactions: [{ nonce: 0 }]
-      };
-    }
-    if (args[0] === 'accounts') return { count: 1, accounts: [] };
-    if (args[0] === 'economics') return { tip_height: 2 };
-    throw new Error(`Unexpected command ${args.join(' ')}`);
+    return expected;
   };
 
   const snapshot = await buildSnapshot(
@@ -97,11 +86,26 @@ test('snapshot builder exports the complete active chain and details tx blocks',
     'shadow',
     run
   );
-  assert.equal(snapshot.schema, 1);
-  assert.deepEqual(snapshot.blocks.map(block => block.height), [2, 1, 0]);
-  assert.deepEqual(snapshot.blocks[0].transactions, []);
-  assert.equal(snapshot.blocks[1].transactions.length, 1);
-  assert.equal(calls.filter(args => args[0] === 'block').length, 1);
+  assert.deepEqual(snapshot, expected);
+  assert.deepEqual(calls, [['snapshot']]);
+});
+
+test('snapshot builder rejects incomplete single-pass output', async () => {
+  await assert.rejects(
+    buildSnapshot(
+      { lxe: 'lxe' },
+      'node-shadow',
+      'shadow',
+      async () => ({
+        schema: 1,
+        tip: { network: 'shadow', height: 2 },
+        blocks: [{ height: 2 }],
+        accounts: {},
+        economics: {}
+      })
+    ),
+    /Invalid explorer snapshot/
+  );
 });
 
 test('snapshot upload uses bearer authentication', async () => {

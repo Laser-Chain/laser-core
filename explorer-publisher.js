@@ -31,11 +31,11 @@ function resolvePublisherConfig(options = {}) {
   ].filter(Boolean);
   const lxe = candidates.find(candidate => exists(candidate));
   const requestedInterval = Number(
-    fileConfig.interval_ms || env.LASER_EXPLORER_INTERVAL_MS || 10000
+    fileConfig.interval_ms || env.LASER_EXPLORER_INTERVAL_MS || 3000
   );
   const intervalMs = Number.isFinite(requestedInterval)
     ? Math.max(3000, Math.min(requestedInterval, 600000))
-    : 10000;
+    : 3000;
   if (!url || !token || !lxe) return null;
   try {
     const endpoint = new URL(url);
@@ -46,12 +46,17 @@ function resolvePublisherConfig(options = {}) {
   }
 }
 
-function runLxe(binary, datadir, network, args, timeout = 60000) {
+function runLxe(binary, datadir, network, args, timeout = 120000) {
   return new Promise((resolve, reject) => {
     execFile(
       binary,
       [...args, '--datadir', datadir, '--network', network],
-      { encoding: 'utf8', timeout, windowsHide: true },
+      {
+        encoding: 'utf8',
+        timeout,
+        windowsHide: true,
+        maxBuffer: 128 * 1024 * 1024
+      },
       (error, stdout, stderr) => {
         if (error) {
           reject(new Error((stderr || error.message).trim()));
@@ -68,37 +73,21 @@ function runLxe(binary, datadir, network, args, timeout = 60000) {
 }
 
 async function buildSnapshot(config, datadir, network, run = runLxe) {
-  const tip = await run(config.lxe, datadir, network, ['tip']);
-  const blocks = [];
-  let from = Number(tip.height);
-  while (from >= 0) {
-    const page = await run(
-      config.lxe,
-      datadir,
-      network,
-      ['blocks', '--limit', '500', '--from', String(from)]
-    );
-    if (!Array.isArray(page.blocks) || page.blocks.length === 0) break;
-    for (const header of page.blocks) {
-      const block = Number(header.tx_count) > 0
-        ? await run(config.lxe, datadir, network, ['block', String(header.height)])
-        : { ...header, transactions: [] };
-      blocks.push(block);
-    }
-    const oldest = Math.min(...page.blocks.map(block => Number(block.height)));
-    if (oldest <= 0) break;
-    from = oldest - 1;
+  const snapshot = await run(config.lxe, datadir, network, ['snapshot']);
+  const height = Number(snapshot?.tip?.height);
+  if (
+    snapshot?.schema !== 1 ||
+    snapshot?.tip?.network !== network ||
+    !Number.isSafeInteger(height) ||
+    height < 0 ||
+    !Array.isArray(snapshot.blocks) ||
+    snapshot.blocks.length !== height + 1 ||
+    !snapshot.accounts ||
+    !snapshot.economics
+  ) {
+    throw new Error('Invalid explorer snapshot');
   }
-  const expected = Number(tip.height) + 1;
-  const heights = new Set(blocks.map(block => Number(block.height)));
-  if (blocks.length !== expected || heights.size !== expected) {
-    throw new Error(`Incomplete explorer snapshot: expected ${expected} blocks, got ${blocks.length}`);
-  }
-  const [accounts, economics] = await Promise.all([
-    run(config.lxe, datadir, network, ['accounts']),
-    run(config.lxe, datadir, network, ['economics'])
-  ]);
-  return { schema: 1, generated_at: Date.now(), tip, blocks, accounts, economics };
+  return snapshot;
 }
 
 async function sendSnapshot(config, snapshot, request = globalThis.fetch) {

@@ -635,7 +635,7 @@ function updateSplash(text, progress) {
   splashWindow.webContents.send('splash:status', { text, progress });
 }
 
-async function waitForNodeReady(timeoutMs = 90000) {
+async function waitForNodeReady(timeoutMs = 300000) {
   const startedAt = Date.now();
   let attempt = 0;
   let lastRpcError = '';

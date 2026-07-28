@@ -155,6 +155,10 @@ npm run prepare:sandbox
 npm run release:win
 ```
 
+The v3 preparation step also stages the optimized explorer helper. Keep the
+`laser-explorer` checkout beside the Laser source tree, or set
+`LASER_EXPLORER_SOURCE_DIR` to its path.
+
 The release workflow stages exact node binaries under the ignored `.runtime/`
 directory, rejects version or hash mismatches, refuses dirty application
 source, runs the full test suite, and assembles the final directory atomically.

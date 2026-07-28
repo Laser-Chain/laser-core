@@ -88,6 +88,10 @@
           "laser-cuda-miner.exe",
           "BUILDINFO.txt"
         ]
+      },
+      {
+        "from": ".runtime/explorer/lxe.exe",
+        "to": "bin/explorer/lxe.exe"
       }
     ],
     "win": {

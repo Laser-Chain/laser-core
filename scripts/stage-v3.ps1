@@ -1,5 +1,6 @@
 param(
-  [string]$SourceRoot = $env:LASER_SOURCE_DIR
+  [string]$SourceRoot = $env:LASER_SOURCE_DIR,
+  [string]$ExplorerSourceRoot = $env:LASER_EXPLORER_SOURCE_DIR
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,6 +24,25 @@ New-Item -ItemType Directory -Path $output -Force | Out-Null
 foreach ($name in $required) {
   Copy-Item -LiteralPath (Join-Path $sourceBuild $name) -Destination $output -Force
 }
+$explorerCandidates = @()
+if ($ExplorerSourceRoot) {
+  $explorerCandidates += (Resolve-Path $ExplorerSourceRoot).Path
+}
+$explorerCandidates += @(
+  (Join-Path $SourceRoot 'laser-explorer'),
+  (Join-Path (Split-Path $SourceRoot -Parent) 'laser-explorer'),
+  (Join-Path (Split-Path $AppDir -Parent) 'laser-explorer')
+)
+$explorerSource = $explorerCandidates |
+  ForEach-Object { Join-Path $_ 'build\lxe.exe' } |
+  Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+  Select-Object -First 1
+if (-not $explorerSource) {
+  throw 'Missing optimized explorer helper. Build laser-explorer first or set LASER_EXPLORER_SOURCE_DIR.'
+}
+$explorerOutput = Join-Path $AppDir '.runtime\explorer'
+New-Item -ItemType Directory -Path $explorerOutput -Force | Out-Null
+Copy-Item -LiteralPath $explorerSource -Destination (Join-Path $explorerOutput 'lxe.exe') -Force
 $cudaSource = Join-Path $sourceBuild 'laser-cuda-miner.exe'
 $cudaOutput = Join-Path $output 'laser-cuda-miner.exe'
 if (Test-Path -LiteralPath $cudaSource -PathType Leaf) {
