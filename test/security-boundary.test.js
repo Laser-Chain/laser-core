@@ -66,8 +66,12 @@ test('renderer stays local, sandboxed, and protected by CSP', () => {
 
 test('activity messages are rendered as text, never interpolated HTML', () => {
   const renderer = read('renderer/app.js');
+  const template = read('renderer/template.js');
   assert.doesNotMatch(renderer, /\.innerHTML\s*=/);
-  assert.match(renderer, /description\.textContent = entry\.msg/);
+  assert.doesNotMatch(template, /dangerouslySetInnerHTML|\.innerHTML\s*=/);
+  assert.match(template, /React\.createElement/);
+  assert.match(template, /a\?\.text/);
+  assert.doesNotMatch(renderer + template, /new Function\(|\beval\(|makeMock/);
 });
 
 test('privileged IPC revalidates mining and transaction arguments', () => {

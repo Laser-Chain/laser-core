@@ -17,3 +17,5 @@ wallets/
 *.secrets.json
 Thumbs.db
 .DS_Store
+__pycache__/
+*.pyc

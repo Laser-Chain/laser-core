@@ -10,7 +10,7 @@ function source(relativePath) {
 const mainSource = source('main.js');
 const preloadSource = source('preload.js');
 const rendererSource = source(path.join('renderer', 'app.js'));
-const htmlSource = source(path.join('renderer', 'index.html'));
+const htmlSource = source(path.join('ui-src', 'app.template.html'));
 
 test('wallet operations are separated across the isolated IPC boundary', () => {
   for (const operation of ['list', 'open', 'create', 'restore']) {
@@ -23,13 +23,14 @@ test('wallet operations are separated across the isolated IPC boundary', () => {
 });
 
 test('wallet UI selects existing files and presents explicit actions', () => {
-  assert.match(htmlSource, /id="ov-wallet-select"/);
-  assert.match(htmlSource, /id="btn-wallet-open"/);
-  assert.match(htmlSource, /id="btn-wallet-create"/);
-  assert.match(htmlSource, /id="btn-wallet-restore"/);
+  assert.match(htmlSource, /<select[^>]+value="\{\{ selected \}\}"/);
+  assert.match(htmlSource, /onClick="\{\{ openSelected \}\}"/);
+  assert.match(htmlSource, /onClick="\{\{ openCreate \}\}"/);
+  assert.match(htmlSource, /onClick="\{\{ openRestore \}\}"/);
   assert.doesNotMatch(htmlSource, /Open \/ Create/);
-  assert.match(rendererSource, /window\.laser\.walletList\(\)/);
-  assert.match(rendererSource, /window\.laser\.walletOpen\(/);
-  assert.match(rendererSource, /window\.laser\.walletCreate\(/);
-  assert.match(rendererSource, /window\.laser\.walletRestore\(/);
+  assert.match(rendererSource, /this\.m=window\.laser/);
+  assert.match(rendererSource, /this\.m\.walletList\(\)/);
+  assert.match(rendererSource, /\.walletOpen\(/);
+  assert.match(rendererSource, /\.walletCreate\(/);
+  assert.match(rendererSource, /\.walletRestore\(/);
 });

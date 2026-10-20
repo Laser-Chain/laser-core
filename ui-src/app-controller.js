@@ -1,0 +1,796 @@
+
+const P = 1000000000n, U64 = 18446744073709551615n, HEX = /^[0-9a-f]{64}$/, NAME = /^[A-Za-z0-9_]{1,64}$/;
+const INK = '#0e0f12', SUB = '#62646b', FAINT = '#8a8b90', OK = '#1e7a46', WARN = '#8a4b00', ERR = '#a1203d';
+const VIEWS = [['overview', 'Overview', '#6a2cf0'], ['send', 'Send', '#c4237f'], ['receive', 'Receive', '#00897d'], ['mining', 'Mining', '#2a5cf5'], ['network', 'Network', '#0a84c8']];
+const FEES = [['0.05', 'Priority'], ['0.02', 'High'], ['0.01', 'Standard'], ['0.005', 'Low'], ['0.001', 'Minimum']];
+const SPECTRUM = ['#6a2cf0', '#2a5cf5', '#0a84c8', '#00897d', '#3f9a2e', '#c4237f'];
+
+const CKEY = 'laser-core.contacts.v1', PREFS_KEY = 'laser-core.preferences.v1';
+
+function parseLaser(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (s.length > 32) return null;
+  if (!/^\d+(\.\d{1,9})?$/.test(s)) return null;
+  const [w, f = ''] = s.split('.');
+  const r = BigInt(w) * P + BigInt(f.padEnd(9, '0'));
+  return r > U64 ? null : r;
+}
+function dec(p) { p = BigInt(p); const n = p < 0n; if (n) p = -p; return (n ? '-' : '') + (p / P).toString() + '.' + (p % P).toString().padStart(9, '0'); }
+function grpS(s) { return s.replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+function amt(p, signed) {
+  if (p == null) return { s: '', i: '—', f: '', z: '', full: 'Unavailable' };
+  p = BigInt(p); const n = p < 0n, a = n ? -p : p;
+  const f = (a % P).toString().padStart(9, '0'), sig = f.replace(/0+$/, '');
+  return { s: n ? '−' : (signed && a > 0n ? '+' : ''), i: grpS((a / P).toString()), f: sig ? '.' + sig : '', z: sig ? f.slice(sig.length) : '.' + f, full: dec(p) + ' LASER · ' + p.toString() + ' photons' };
+}
+function laser(p, signed) { if (p == null) return '—'; const a = amt(p, signed); return a.s + a.i + a.f + a.z; }
+function short(a) { return a ? a.slice(0, 8) + '…' + a.slice(-8) : ''; }
+function grp(n) { return n == null ? '—' : Number(n).toLocaleString('en-US'); }
+function hms(ms) { const s = Math.max(0, Math.floor(ms / 1000)); return [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map(x => String(x).padStart(2, '0')).join(':'); }
+function clock(t) { return t ? new Date(t).toLocaleTimeString('en-GB', { hour12: false }) : '—'; }
+function ago(ms) { const s = Math.max(0, Math.round(ms / 1000)); return s < 60 ? s + ' s ago' : s < 3600 ? Math.floor(s / 60) + ' min ago' : Math.floor(s / 3600) + ' h ago'; }
+class Component extends React.Component {
+  state = this.fresh();
+  timers = [];
+
+  fresh() {
+    return {
+      phase: 'main', view: 'overview', vw: window.innerWidth, vh: window.innerHeight, now: Date.now(),
+      splash: { text: '', progress: 0, log: [], error: false, detail: '', slow: false, final: false, t0: Date.now() },
+      node: { online: null, status: null, peers: null, err: null, lastOk: null, startup: null },
+      wallets: [], selected: '', unlocked: {}, records: {}, metricsByWallet: {}, metrics: null, metricsErr: null, metricsAt: null, walletErr: null,
+      mining: null, solves: [], activity: [], dlg: null, toast: null,
+      send: { to: '', label: '', from: '', amount: '', subtract: false, fee: '0.01', feeCustom: '', touched: {} },
+      contacts: this.loadContacts(), copiedAt: 0,
+      mineErr: null, mineBusy: false, mineWallet: '', intervalStr: '10', onceStr: '1', onceBusy: false, onceMsg: null, cfg: null, showDetail: false
+    };
+  }
+  loadContacts() {
+    try { const c = JSON.parse(localStorage.getItem(CKEY) || '{}'); return (Array.isArray(c) ? c : Object.entries(c).map(([address,label])=>({address,label}))).filter(x=>x && HEX.test(x.address) && typeof x.label==='string').map(x=>({address:x.address,label:x.label.slice(0,64)})); } catch (_) { return []; }
+  }
+  saveContacts(list) { try { localStorage.setItem(CKEY,JSON.stringify(Object.fromEntries(list.map(x=>[x.address,x.label])))); } catch (_) {} }
+  preferences() { try { return JSON.parse(localStorage.getItem(PREFS_KEY)||'{}') || {}; } catch (_) { return {}; } }
+  savePreference(patch) { try { localStorage.setItem(PREFS_KEY,JSON.stringify({...this.preferences(),...patch})); } catch (_) {} }
+  update(patch) { return new Promise(resolve=>this.setState(patch,resolve)); }
+  showDialog(dlg) { this.returnFocus=document.activeElement; this.setState({dlg}); }
+  dialogFocus() {
+    const dlg=document.querySelector('[role="dialog"]');
+    if (!dlg) return;
+    const field=dlg.querySelector('input:not(:disabled),button:not(:disabled),[tabindex="0"]');
+    (field || dlg).focus();
+  }
+
+  componentDidMount() {
+    this.onKey = e => {
+      if (e.key === 'Escape' && this.state.dlg) { e.preventDefault(); this.closeDlg(); }
+      if (this.state.dlg && e.key==='Tab') {
+        const dlg=document.querySelector('[role="dialog"]');
+        const items=dlg ? [...dlg.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"]')].filter(el=>el.getClientRects().length) : [];
+        if (!items.length) { e.preventDefault(); dlg?.focus(); return; }
+        const index=items.indexOf(document.activeElement);
+        if (e.shiftKey && index<=0) { e.preventDefault(); items.at(-1).focus(); }
+        else if (!e.shiftKey && (index===items.length-1 || index<0)) { e.preventDefault(); items[0].focus(); }
+      }
+      if (!this.state.dlg && (e.ctrlKey || e.metaKey) && /^[1-5]$/.test(e.key) && this.state.phase === 'main') { e.preventDefault(); this.setState({ view: VIEWS[+e.key - 1][0] }); }
+    };
+    this.onResize = () => this.setState({ vw: window.innerWidth, vh: window.innerHeight });
+    document.addEventListener('keydown', this.onKey);
+    window.addEventListener('resize', this.onResize);
+    this.tickT = setInterval(() => this.setState({ now: Date.now() }), 1000);
+    this.init();
+  }
+  beamRef = el => { this.cv = el; if (el && !this.raf) this.raf = requestAnimationFrame(t => this.drawBeam(t)); };
+  drawBeam(now) {
+    this.raf = null;
+    const cv = this.cv; if (!cv) return;
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!reduce) this.raf = requestAnimationFrame(t => this.drawBeam(t));
+    if (this.lastDraw && now - this.lastDraw < 33 && !reduce) return;
+    this.lastDraw = now;
+    const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+    if (!W || !H) return;
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const s = this.state, online = s.node.online === true, mining = !!(s.mining && s.mining.mining), mode = s.view;
+    const speed = mode === 'overview' || mode === 'mining' ? (mining ? 1 : 0.38) : 0.6;
+    this.bt = (this.bt || 0) + (reduce ? 0 : Math.min(0.1, (now - (this.prevNow || now)) / 1000) * speed); this.prevNow = now;
+    const t = this.bt, C = 8, cols = Math.ceil(W / C), rows = Math.ceil(H / C), mid = (rows - 1) / 2;
+    const FULL = ['#6a2cf0', '#2a5cf5', '#0a84c8', '#00a3a3', '#3f9a2e', '#b8a600', '#f08a00', '#ef3e36', '#e0207f', '#a62cf0'];
+    const PRISM = ['#6a2cf0', '#2a5cf5', '#0a84c8', '#00a3a3', '#3f9a2e', '#b8a600', '#f08a00', '#ef3e36', '#e0207f'];
+    const COOL = ['#6a2cf0', '#2a5cf5', '#0a84c8', '#00a3a3', '#00897d', '#3f9a2e'];
+    const pulse = this.pulseAt ? Math.min(1, (now - this.pulseAt) / 1400) : 1;
+    const start = Math.max(cols * 0.32, 26), span = Math.max(1, cols - start);
+    let px = -999;
+    if (pulse < 1) px = mode === 'receive' ? cols + 10 - pulse * (span + 20) : start - 10 + pulse * (span + 20);
+    const hash = (x, y, k) => Math.abs(Math.sin(x * 12.9898 + y * 78.233 + k * 3.1) * 43758.5453) % 1;
+    if (mode === 'mining') {
+      const ms = s.mining, sess = ms && ms.session, solving = mining && sess && !sess.next_run_at;
+      const base = rows - 6, ledgerRow = rows - 3, steps = 7, top = 2;
+      const scanP = 2.4, scanX = solving ? start + ((now / 1000) % scanP) / scanP * span : -999;
+      const glob = !online ? 1 : mining ? 1 : 0.5;
+      // dotted horizon on the left
+      for (let x = 0; x < Math.ceil(start); x++) {
+        const fade = x / start, h = hash(x, base, Math.floor(t * 2));
+        g.fillStyle = online ? '#0e0f12' : '#c9c8c1';
+        if (h < 0.55 * fade) { g.globalAlpha = 0.85; g.fillRect(x * C + 1, base * C + 1, C - 2, C - 2); }
+        else if (h < 0.8 * fade + 0.05) { g.globalAlpha = 0.5; g.fillRect(x * C + 3, base * C + 1, 1.5, C - 2); }
+        else if (h < 0.9 * fade + 0.1) { g.globalAlpha = 0.35; g.fillRect(x * C + 3, base * C + 3, 1.5, 1.5); }
+      }
+      for (let x = Math.floor(start); x < cols; x++) {
+        const u = (x - start) / span;
+        const level = Math.floor(Math.min(0.999, u) * steps + 1) / steps;
+        const ease = Math.min(1, u * steps - Math.floor(u * steps) + 0.6);
+        const topRow = Math.round(base - (base - top) * level * (0.25 + 0.75 * Math.min(1, u * 1.15)) * Math.min(1, ease));
+        const ahead = solving && x > scanX, near = solving ? Math.max(0, 1 - Math.abs(x - scanX) / 2.2) : 0;
+        for (let y = topRow; y <= base; y++) {
+          const depth = (y - topRow) / 2.2;
+          const flow = Math.floor(t * (solving ? 9 : 2) + x * 0.13);
+          const h = hash(x, y, flow);
+          let d = Math.min(1, 0.25 + depth) * (0.75 + 0.25 * Math.sin(x * 0.5 + y + t * 3));
+          const k = Math.min(0.999, Math.max(0, (y - top) / Math.max(1, base - top)));
+          let col = online ? PRISM[Math.floor(k * PRISM.length)] : (y % 2 ? '#c9c8c1' : '#d9d8d2');
+          if (near > 0.2 && online) { col = '#0e0f12'; d = Math.max(d, near); }
+          let a = glob * (ahead ? 0.32 : 1);
+          if (pulse < 1) a = Math.min(1, a + (1 - pulse) * 0.7);
+          g.fillStyle = col;
+          const X = x * C, Y = y * C;
+          if (h < d * 0.85) { g.globalAlpha = a; g.fillRect(X + 1, Y + 1, C - 2, C - 2); }
+          else if (h < d * 0.85 + 0.14) { g.globalAlpha = a * 0.9; g.fillRect(X + 3, Y + 1, 1.5, C - 2); }
+          else if (h < d * 0.85 + 0.22) { g.globalAlpha = a * 0.6; g.fillRect(X + 3, Y + 3, 1.5, 1.5); g.fillRect(X + 3, Y + 6, 1.5, 1.5); }
+        }
+        // candidate sparks above the profile while solving / burst on a mined block
+        const sh = hash(x, 7, Math.floor(t * 6));
+        if (online && solving && Math.abs(x - scanX) < 6 && sh < 0.35) { g.globalAlpha = 0.7; g.fillStyle = '#0e0f12'; g.fillRect(x * C + 3, (topRow - 1 - Math.floor(sh * 6)) * C + 3, 1.5, 1.5); }
+        if (online && pulse < 1 && sh < 0.3) { g.globalAlpha = 1 - pulse; g.fillStyle = PRISM[Math.floor(hash(x, 3, 1) * PRISM.length)]; const yy = topRow - 1 - pulse * rows * 0.5 - sh * 8; if (yy > 0) g.fillRect(x * C + 2, yy * C, 3, 3); }
+      }
+      // session ledger: one cell per block mined this session
+      const blocks = sess && sess.started_at ? Math.min(sess.blocks, Math.floor(span)) : 0;
+      for (let i = 0; i < blocks; i++) {
+        const X = (Math.floor(start) + i) * C, Y = ledgerRow * C;
+        g.globalAlpha = 1; g.fillStyle = i === blocks - 1 && Math.floor(now / 500) % 2 ? '#6a2cf0' : '#0e0f12';
+        g.fillRect(X + 1, Y + 1, C - 2, C - 2);
+      }
+      if (blocks === 0 && online) { g.globalAlpha = 0.5; g.fillStyle = '#c9c8c1'; for (let x = Math.floor(start); x < Math.min(cols, Math.floor(start) + 24); x += 2) g.fillRect(x * C + 3, ledgerRow * C + 3, 1.5, 1.5); }
+      g.globalAlpha = 1;
+      return;
+    }
+    for (let x = 0; x < cols; x++) {
+      const u = (x - start) / span;
+      const boost = Math.max(0, 1 - Math.abs(x - px) / 5);
+      if (u < 0 && boost <= 0) continue;
+      let c = mid, half, wave = 1, pal = FULL, ramp = Math.min(1, Math.max(0, u / 0.38)), floor = 0;
+      if (mode === 'send') {
+        half = 0.6 + Math.pow(Math.max(0, u), 1.25) * rows * 0.55;
+        wave = 0.55 + 0.45 * Math.sin((x - t * 18) * 0.22);
+        ramp = Math.min(1, Math.max(0, u / 0.06)); pal = PRISM;
+      } else if (mode === 'receive') {
+        half = 0.6 + Math.pow(Math.max(0, u), 1.1) * rows * 0.6;
+        wave = 0.55 + 0.45 * Math.sin((x + t * 18) * 0.22);
+        ramp = Math.min(1, Math.max(0, u / 0.04)); pal = COOL; floor = Math.max(0, u) * 0.07;
+      } else {
+        c = mid + Math.sin(x * 0.07 + t * 0.9) * rows * 0.16 + Math.sin(x * 0.023 - t * 0.4) * rows * 0.12;
+        half = rows * (0.22 + 0.24 * ramp + 0.06 * Math.sin(x * 0.11 + t));
+      }
+      for (let y = 0; y < rows; y++) {
+        const off = (y - c) / half, dist = Math.abs(off);
+        let d = ramp * Math.max(0, 1 - Math.pow(dist, mode === 'overview' ? 1.6 : 1.2)) * wave + floor + boost * 0.6 * Math.max(0, 1 - dist * 0.5);
+        if (d <= 0.01) continue;
+        const flow = mode === 'send' ? Math.floor(x * 0.5 - t * 9) : mode === 'receive' ? Math.floor(x * 0.5 + t * 9) : Math.floor(t * 2 + x * 0.05);
+        const h = hash(x, y, flow);
+        let col;
+        if (!online) col = y % 2 ? '#c9c8c1' : '#d9d8d2';
+        else if (mode === 'overview') col = pal[Math.floor((((y / rows) * 0.55 + (x / cols) * 0.25 + t * 0.06) % 1) * pal.length)];
+        else { const k = Math.min(0.999, Math.max(0, (off + 1) / 2)); col = (half < 1.6 || dist < 0.12 && u < 0.2) ? '#0e0f12' : pal[Math.floor(k * pal.length)]; }
+        g.fillStyle = boost > 0.3 && online ? '#0e0f12' : col;
+        const X = x * C, Y = y * C;
+        if (h < d * 0.9) { g.globalAlpha = 1; g.fillRect(X + 1, Y + 1, C - 2, C - 2); }
+        else if (h < d * 0.9 + 0.12) { g.globalAlpha = 0.9; g.fillRect(X + 3, Y + 1, 1.5, C - 2); }
+        else if (h < d * 0.9 + 0.2) { g.globalAlpha = 0.6; g.fillRect(X + 3, Y + 3, 1.5, 1.5); g.fillRect(X + 3, Y + 6, 1.5, 1.5); }
+      }
+    }
+    g.globalAlpha = 1;
+  }
+  componentWillUnmount() { this.destroyed=true; cancelAnimationFrame(this.raf); this.cleanup(); clearInterval(this.tickT); clearTimeout(this.toastT); document.removeEventListener('keydown',this.onKey); window.removeEventListener('resize',this.onResize); }
+  componentDidUpdate(_props,previous) {
+    if (previous.dlg?.type !== this.state.dlg?.type || previous.dlg?.mode !== this.state.dlg?.mode) {
+      if (this.state.dlg) { this.dialogFocus(); }
+      else if (this.returnFocus?.isConnected) this.returnFocus.focus();
+    }
+    if (previous.view !== this.state.view) {
+      document.querySelector('[data-view-scroll]')?.scrollTo(0,0);
+      this.cv && this.drawBeam(performance.now());
+    }
+  }
+  cleanup() { this.timers.forEach(clearTimeout); this.timers=[]; clearInterval(this.pollT); for(const unsubscribe of this.subscriptions||[]) if(typeof unsubscribe==='function') unsubscribe(); this.subscriptions=[]; }
+
+  ev(kind, text, detail) { return { id: Math.random(), t: Date.now(), kind, text, detail: detail || '' }; }
+  log(kind, text, detail) { this.setState(s => ({ activity: [this.ev(kind, text, detail), ...s.activity].slice(0, 60) })); }
+  toast(text, dot) { clearTimeout(this.toastT); this.setState({ toast: { text, dot: dot || OK } }); this.toastT = setTimeout(() => this.setState({ toast: null }), 6000); }
+
+  init() {
+    this.cleanup();
+    this.m=window.laser;
+    this.walletEpoch={}; this.localBlocks=0;
+    if (!this.m) { this.setState(s=>({node:{...s.node,online:false,err:'The native Laser Core bridge is unavailable.'}})); return; }
+    const m=this.m;
+    this.subscriptions=[m.onBlockMined(st=>{
+      if(this.destroyed) return;
+      this.localBlocks++; this.pulseAt=performance.now();
+      this.setState(s=>({mining:st,mineErr:null,solves:[...s.solves,{ms:st.session.last_duration_ms,t:Date.now()}].slice(-48),activity:[this.ev('mined','Block mined with '+st.wallet,'solve '+(st.session.last_duration_ms/1000).toFixed(2)+' s'),...s.activity].slice(0,60)}));
+      this.refreshSelected();
+    }),m.onMineError((msg,st)=>{
+      if(!this.destroyed) this.setState(s=>({mining:st,mineErr:msg,activity:[this.ev('err','Mining cycle failed',msg),...s.activity].slice(0,60)}));
+    })];
+    this.openMain();
+  }
+
+  async openMain() {
+    const m = this.m;
+    this.setState({ phase: 'main' });
+    try { const st = await m.startup(); if (m === this.m) this.setState(s => ({ node: { ...s.node, startup: st } })); } catch (e) { }
+    try { await this.refreshWallets(this.preferences().activeWallet); } catch(e) { this.setState({walletErr:e.message}); }
+    try { const cfg = await m.config(); if (m === this.m) this.setState({ cfg }); } catch (e) { }
+    try { const st = await m.mineStatus(); if (m === this.m) this.setState({ mining: st }); } catch (e) { }
+    this.poll();
+    clearInterval(this.pollT);
+    this.pollT = setInterval(() => this.poll(), 2000);
+  }
+
+  async refreshWallets(pick) {
+    const list=await this.m.walletList(), unlocked={};
+    await Promise.all(list.map(async n=>{unlocked[n]=await this.m.walletUnlocked(n);}));
+    if(this.destroyed)return;
+    await this.update(s=>{
+      const selected=list.includes(pick) ? pick : list.includes(s.selected) ? s.selected : list[0]||'';
+      const mineWallet=s.mining?.mining ? s.mining.wallet : list.includes(s.mineWallet) ? s.mineWallet : selected;
+      const records={...s.records}, metricsByWallet={...s.metricsByWallet};
+      for(const n of Object.keys(records)) if(!unlocked[n]) {delete records[n];delete metricsByWallet[n];this.walletEpoch[n]=(this.walletEpoch[n]||0)+1;}
+      return {wallets:list,unlocked,selected,mineWallet,records,metricsByWallet,metrics:unlocked[selected]?s.metrics:null,walletErr:null};
+    });
+  }
+
+  async poll() {
+    const m = this.m;
+    if (this.polling) return; this.polling = true;
+    try {
+      let status = null, peers = null, err = null;
+      const results=await Promise.allSettled([m.status(),m.peers()]);
+      if(results[0].status==='fulfilled') status=results[0].value; else err=results[0].reason.message;
+      if(results[1].status==='fulfilled') peers=results[1].value;
+      try { await this.refreshWallets(); } catch(e) { this.setState({walletErr:e.message}); }
+      if (m !== this.m || this.destroyed) return;
+      const local = this.localBlocks; this.localBlocks = 0;
+      this.setState(s => {
+        const node = { ...s.node }; const act = s.activity.slice();
+        if (status) {
+          if (node.online === false && node.lastOk) act.unshift(this.ev('ok', 'Reconnected to the local node'));
+          const prev = node.status ? node.status.height : null;
+          if (prev !== null && status.height > prev) {
+            const other = status.height - prev - local;
+            if (other > 0) {
+              if (act[0] && act[0].kind === 'chain') act[0] = { ...act[0], t: Date.now(), text: `Chain advanced to #${grp(status.height)}`, detail: `+${act[0].n + other} blocks · not mined by this app`, n: act[0].n + other };
+              else act.unshift({ ...this.ev('chain', `Chain advanced to #${grp(status.height)}`, `+${other} block${other > 1 ? 's' : ''} · not mined by this app`), n: other });
+            }
+          }
+          Object.assign(node, { online: true, status, peers, err: null, lastOk: Date.now() });
+        } else {
+          if (node.online !== false && node.lastOk) act.unshift(this.ev('err', 'Lost connection to the local node', err));
+          Object.assign(node, { online: false, err });
+        }
+        return { node, activity: act.slice(0, 60), metrics:status?s.metrics:null, metricsByWallet:status?s.metricsByWallet:{} };
+      });
+      try { const st = await m.mineStatus(); if (m === this.m) this.setState({ mining: st }); } catch (e) { }
+      await this.refreshSelected();
+    } finally { this.polling = false; }
+  }
+
+  async refreshSelected() {
+    const m=this.m;
+    const names=Object.keys(this.state.unlocked).filter(n=>this.state.unlocked[n]);
+    await Promise.all(names.map(async n=>{
+      const epoch=this.walletEpoch[n]||0;
+      const current=()=>!this.destroyed && m===this.m && !!this.state.unlocked[n] && epoch===(this.walletEpoch[n]||0);
+      try {
+        const r=await m.walletOpen(n);
+        if(!current())return;
+        await this.update(s=>({records:{...s.records,[n]:r}}));
+      } catch(e) {
+        if(!current())return;
+        let unlocked=true;
+        try { unlocked=await m.walletUnlocked(n); } catch(_) {}
+        if(!unlocked){this.walletEpoch[n]=(this.walletEpoch[n]||0)+1;this.setState(s=>{const records={...s.records};delete records[n];return {unlocked:{...s.unlocked,[n]:false},records,metrics:s.selected===n?null:s.metrics};});return;}
+      }
+      if(!current() || !this.state.node.online)return;
+      try {
+        const met=await m.minerMetrics(n);
+        if(!current())return;
+        const fields=['confirmed_photons','projected_photons','pending_received_photons','pending_spent_photons','total_mined_photons','subsidy_photons','fee_photons','next_reward_photons'];
+        for(const field of fields) if(met[field]!=null) {
+          if((typeof met[field]==='number' && !Number.isSafeInteger(met[field])) || !/^\d+$/.test(String(met[field]))) throw new Error('The node returned an imprecise monetary value.');
+        }
+        if(fields.slice(0,4).some(field=>met[field]==null))throw new Error('The node did not report pending balance information.');
+        this.setState(s=>({metricsByWallet:{...s.metricsByWallet,[n]:{...met,wallet:n}},...(s.selected===n?{metrics:{...met,wallet:n},metricsErr:null,metricsAt:Date.now()}: {})}));
+      } catch(e) { if(current())this.setState(s=>{const all={...s.metricsByWallet};delete all[n];return {metricsByWallet:all,...(s.selected===n?{metrics:null,metricsErr:e.message}:{})};}); }
+    }));
+  }
+
+  selectWallet(name) {
+    this.savePreference({activeWallet:name});
+    this.setState(s=>({selected:name,metrics:s.metricsByWallet[name]||null,metricsErr:null,copiedAt:0,mineWallet:s.mining?.mining?s.mineWallet:name}),()=>this.refreshSelected());
+  }
+  openWallet(name) {
+    if (!name) return;
+    if (this.state.unlocked[name]) { this.selectWallet(name); return; }
+    this.showDialog({ type: 'pass', mode: 'unlock', name, p1: '', p2: '', err: null, busy: false });
+  }
+  async lockWallet(name) {
+    if(!name || this.locking)return;
+    this.locking=true;this.walletEpoch[name]=(this.walletEpoch[name]||0)+1;
+    const wasMining=this.state.mining?.mining && this.state.mining.wallet===name;
+    try {
+      await this.m.walletLock(name);
+      await this.update(s=>{const records={...s.records},metricsByWallet={...s.metricsByWallet};delete records[name];delete metricsByWallet[name];return {unlocked:{...s.unlocked,[name]:false},records,metricsByWallet,metrics:s.selected===name?null:s.metrics};});
+      try {this.setState({mining:await this.m.mineStatus()});}catch(_){}
+      this.log('wallet','Locked '+name,wasMining?'continuous mining stopped':'');
+      if(wasMining)this.toast(name+' is locked. Its mining session has stopped.',WARN);
+    } catch(e) {this.toast('Could not lock '+name+': '+e.message,ERR);}
+    finally {this.locking=false;}
+  }
+
+  closeDlg() { const d = this.state.dlg; if (!d || d.busy) return; this.setState({ dlg: null }); }
+
+  async nameSubmit(e) {
+    e.preventDefault();
+    const d = this.state.dlg; if(!d || d.busy)return; const name = d.value.trim();
+    const err = !name ? 'Enter a name.' : !NAME.test(name) ? 'Use only letters, numbers and underscores (1–64). Spaces and symbols are not allowed.' : this.state.wallets.includes(name) ? `A wallet named “${name}” already exists. Choose another name.` : null;
+    if (err) { this.setState({ dlg: { ...d, err, touched: true } }); return; }
+    if (d.mode === 'create') { this.setState({ dlg: { type: 'pass', mode: 'create', name, p1: '', p2: '', err: null, busy: false } }); return; }
+    this.setState({ dlg: { ...d, busy: true, err: null } });
+    try {
+      const r = await this.m.walletRestore(name);
+      if (!r) { this.setState({ dlg: null }); return; }
+      await this.refreshWallets(r.name);
+      this.setState({ dlg: null, metrics: null });
+      this.log('wallet', `Restored backup as ${r.name}`, 'locked · unlock with its original passphrase');
+      this.toast(`Backup restored as ${r.name}. Unlock it with the passphrase it was created with.`);
+    } catch (x) { this.setState({ dlg: { ...d, busy: false, err: x.message } }); }
+  }
+  async passSubmit(e) {
+    e.preventDefault();
+    const d = this.state.dlg; if(!d || d.busy)return;
+    if (!d.p1) { this.setState({ dlg: { ...d, err: 'Enter a passphrase.' } }); return; }
+    if (d.mode === 'create' && d.p1 !== d.p2) { this.setState({ dlg: { ...d, err: 'The passphrases do not match.', p2: '' } }); return; }
+    this.setState({ dlg: { ...d, p1:'',p2:'',busy: true, err: null } });
+    try {
+      const r = d.mode === 'create' ? await this.m.walletCreate(d.name, d.p1) : await this.m.walletOpen(d.name, d.p1);
+      this.walletEpoch[d.name]=(this.walletEpoch[d.name]||0)+1;
+      this.savePreference({activeWallet:d.name});
+      await this.refreshWallets(d.name);
+      this.setState(s => ({ records: { ...s.records, [d.name]: r }, unlocked: { ...s.unlocked, [d.name]: true }, metrics: null, metricsErr: null, dlg: d.mode === 'create' ? { type: 'created', name: d.name, address: r.address } : null }), () => this.refreshSelected());
+      this.log('wallet', d.mode === 'create' ? `Created ${d.name}` : `Unlocked ${d.name}`, short(r.address));
+    } catch (x) { this.setState({ dlg: { ...d, busy: false, err: x.message, p1: '', p2: '' } }); }
+  }
+
+  // ----- send -----
+  sendCalc() {
+    const s = this.state, f = s.send, to = f.to.trim(), toL = to.toLowerCase();
+    const unl = s.wallets.filter(n => s.unlocked[n]);
+    const from = f.from && s.wallets.includes(f.from) ? f.from : (s.unlocked[s.selected] ? s.selected : (unl[0] || s.selected || ''));
+    const toErr = !to ? 'Enter the recipient address.' : /^0x/i.test(to) ? 'Remove the 0x prefix. Laser addresses are 64 hexadecimal characters.' : !/^[0-9a-fA-F]*$/.test(to) ? 'Only the characters 0–9 and a–f are allowed.' : to.length !== 64 ? `An address has 64 characters; this has ${to.length}.` : null;
+    const a = parseLaser(f.amount);
+    const feeStr = f.fee === 'custom' ? f.feeCustom : f.fee;
+    const fee = parseLaser(feeStr);
+    const feeErr = fee === null ? 'Enter a fee with up to 9 decimal places.' : null;
+    let amtErr = !f.amount.trim() ? 'Enter an amount.' : a === null ? 'Use a number with up to 9 decimal places.' : a <= 0n ? 'The amount must be greater than zero.' : null;
+    const recv = a !== null && fee !== null ? (f.subtract ? a - fee : a) : null;
+    const debit = a !== null && fee !== null ? (f.subtract ? a : a + fee) : null;
+    if (!amtErr && f.subtract && recv !== null && recv <= 0n) amtErr = 'With the fee subtracted, the amount must be larger than the fee.';
+    const rec = s.records[from];
+    const senderMetrics=s.metricsByWallet[from];
+    const avail=senderMetrics ? BigInt(senderMetrics.confirmed_photons)-BigInt(senderMetrics.pending_spent_photons) : null;
+    const fromLocked = !!from && !s.unlocked[from];
+    const fromErr = !s.wallets.length ? 'Create or restore a wallet to send from.' : !from ? 'Choose a wallet to send from.' : fromLocked ? `${from} is locked.` : null;
+    const fundsErr = !fromErr && avail === null ? 'Waiting for current balance and pending debits from the node.' : debit!==null && debit>U64 ? 'Amount and fee exceed the supported range.' : !fromErr && avail !== null && debit !== null && debit > avail ? `Total debit is more than the ${laser(avail)} LASER available.` : null;
+    const nodeErr = s.node.online ? null : 'The local node is offline. Sending needs its RPC interface.';
+    const self = !toErr && rec && rec.address === toL;
+    const blocker = nodeErr || fromErr || toErr || amtErr || feeErr || fundsErr;
+    return { to, toL, from, fromLocked, toErr, amtErr, feeErr, fromErr, fundsErr, nodeErr, a, fee, recv, debit, avail, self, blocker, feeStr };
+  }
+  setSend(patch) { this.setState(s => ({ send: { ...s.send, ...patch } })); }
+  touch(k) { this.setState(s => ({ send: { ...s.send, touched: { ...s.send.touched, [k]: true } } })); }
+
+  async confirmSend() {
+    const d = this.state.dlg; if (!d || d.type!=='review' || d.busy || this.sending) return;
+    this.sending = true;
+    this.setState({ dlg: { ...d, busy: true } });
+    try {
+      if(!this.state.node.online || !(await this.m.walletUnlocked(d.from)))throw new Error('Reconnect and unlock the sending wallet before submitting.');
+      const fresh=await this.m.minerMetrics(d.from);
+      const available=BigInt(fresh.confirmed_photons)-BigInt(fresh.pending_spent_photons);
+      if(d.debit>available)throw new Error('The available balance changed. Review the amount and try again.');
+      const out = await this.m.send(d.from, d.to, dec(d.recv), dec(d.fee));
+      this.pulseAt = performance.now();
+      this.setState({ dlg: { type: 'sent', ok: true, out, from: d.from, to: d.to, recv: d.recv, debit: d.debit } });
+      this.log('send', `Sent ${laser(d.recv)} LASER to ${short(d.to)}`, 'accepted by node · awaiting a block');
+      this.refreshSelected();
+    } catch (x) {
+      this.setState({ dlg: { type: 'sent', ok: false, out: x.message, from: d.from, to: d.to, recv: d.recv, debit: d.debit } });
+      this.log('err', 'Send failed', x.message);
+    } finally { this.sending = false; }
+  }
+
+  async mineToggle() {
+    const s = this.state; if (s.mineBusy || s.onceBusy || this.miningAction) return;
+    this.miningAction=true;
+    const mining = s.mining && s.mining.mining;
+    this.setState({ mineBusy: true, mineErr: null });
+    try {
+      if (mining) {
+        const st = await this.m.mineStop();
+        this.setState({ mining: st });
+        this.log('mined', 'Stopped continuous mining', `${st.session.blocks} block(s) this session`);
+      } else {
+        const iv = Number(s.intervalStr);
+        if (!Number.isInteger(iv) || iv < 1 || iv > 120) throw new Error('Set the interval to a whole number from 1 to 120 seconds.');
+        const w = s.mineWallet;
+        if(!s.node.online || !s.unlocked[w])throw new Error('Connect the node and unlock the mining wallet first.');
+        const st = await this.m.mineStart(w, iv * 1000);
+        this.setState({ mining: st, solves: s.mining && s.mining.wallet === w ? s.solves : [] });
+        this.log('mined', `Started continuous mining with ${w}`, `every ${iv} s`);
+      }
+    } catch (x) { this.setState({ mineErr: x.message }); }
+    finally { this.miningAction=false;this.setState({ mineBusy: false }); }
+  }
+  async mineStop() {
+    if(this.miningAction)return;
+    this.miningAction=true;
+    try {const st=await this.m.mineStop();this.setState({mining:st,mineErr:null});this.log('mined','Stopped continuous mining',(st.session?.blocks||0)+' block(s) this session');}
+    catch(e){this.setState({mineErr:e.message});this.toast('Mining could not stop: '+e.message,ERR);}
+    finally{this.miningAction=false;}
+  }
+
+  async mineOnce() {
+    const s = this.state, n = Number(s.onceStr);
+    if(this.onceAction || this.miningAction || s.mining?.mining || !s.node.online || !s.unlocked[s.mineWallet])return;
+    if (!Number.isInteger(n) || n < 1 || n > 100) { this.setState({ onceMsg: { err: true, text: 'Choose a whole number of blocks from 1 to 100.' } }); return; }
+    this.onceAction=true;
+    this.setState({ onceBusy: true, onceMsg: null });
+    try {
+      const out = await this.m.mine(s.mineWallet, n);
+      this.localBlocks += n;
+      const st = await this.m.mineStatus();
+      this.setState({ mining: st, onceMsg: { err: false, text: out } });
+      this.log('mined', `Mined ${n} block${n > 1 ? 's' : ''} with ${s.mineWallet}`, 'one-shot');
+      this.refreshSelected();
+    } catch (x) { this.setState({ onceMsg: { err: true, text: x.message } }); }
+    finally { this.onceAction=false;this.setState({ onceBusy: false }); }
+  }
+  async copyAddr() {
+    const r = this.state.records[this.state.selected]; if (!r) return;
+    try { await this.m.copyAddress(r.address); this.pulseAt = performance.now(); this.setState({ copiedAt: Date.now(), copyErr: null }); }
+    catch (x) { this.setState({ copyErr: x.message, copiedAt: 0 }); }
+  }
+
+  renderVals() {
+    const s = this.state, N = s.node, st = N.status, pe = N.peers;
+    const fixed=null;
+    const winW = fixed ? fixed[0] : s.vw, winH = fixed ? fixed[1] : s.vh;
+    const compact = winW < 900, sbW = compact ? 76 : 200, cw = winW - sbW;
+    const two = cw >= 700;
+    const online = N.online === true, offline = N.online === false, stale = offline && !!N.lastOk;
+    const nv = online ? INK : FAINT;
+    const sel = s.selected, selUnl = !!s.unlocked[sel], rec = s.records[sel];
+    const met = selUnl && s.metrics && s.metrics.wallet === sel ? s.metrics : null;
+    const ms = s.mining, mining = !!(ms && ms.mining), sess = ms ? ms.session : null;
+    const backendLabel = b => b === 'cuda' ? 'NVIDIA CUDA' : b === 'cpu' ? 'CPU' : (b || 'Detecting…');
+    const obsState = st && st.shadow ? st.shadow.state : (N.startup && N.startup.shadow ? N.startup.shadow.state : null);
+    const obs = { v: !online ? 'Unknown while node is offline' : obsState === 'active' ? 'Running' : obsState ? 'Stopped' : 'Not reported', vc: online && obsState === 'active' ? OK : SUB };
+    const self = this;
+
+    // splash
+    const lit = Math.round((s.splash.progress / 100) * 40);
+    const blinkOn = Math.floor(s.now / 1000) % 2 === 0;
+    const sp = {
+      cells: Array.from({ length: 40 }, (_, i) => ({ bg: i < lit ? (s.splash.error ? '#c9c8c1' : SPECTRUM[Math.min(5, Math.floor(i / 40 * 6))]) : (i === lit && !s.splash.error && blinkOn ? '#c9c8c1' : '#ecebe6') })),
+      text: s.splash.text || 'Starting…', color: s.splash.error ? ERR : INK,
+      elapsed: hms(s.now - s.splash.t0).slice(3), isErr: s.splash.error, detail: s.splash.detail, slow: s.splash.slow && !s.splash.error,
+      log: s.splash.log.slice(0, -1).slice(-3).map(l => ({ t: hms(l.at).slice(3), text: l.text })),
+      canContinue: s.splash.error || s.splash.slow
+    };
+
+    // nav / chrome
+    const vIdx = VIEWS.findIndex(v => v[0] === s.view);
+    const nav = VIEWS.map(([id, label, c], i) => {
+      const on = id === s.view;
+      return { label, key: 'Ctrl ' + (i + 1), title: `${label} (Ctrl+${i + 1})`, aria: on ? 'page' : undefined, dot: on ? c : '#d6d5cf', color: on ? INK : SUB, bg: on ? '#ffffff' : 'transparent', border: on ? '#e6e5e0' : 'transparent', go: () => this.setState({ view: id }) };
+    });
+    const sb = compact ? { w: '76px', justify: 'center', dir: 'column', gap: '6px', itemH: '52px', labelFlex: 'none', fs: '10.5px', wide: false, narrow: true } : { w: '200px', justify: 'flex-start', dir: 'row', gap: '10px', itemH: '34px', labelFlex: '1', fs: '13px', wide: true, narrow: false };
+    sb.walPad = winH < 600 ? '10px 14px 12px' : '12px 14px 14px'; sb.itemH = !compact && winH < 600 ? '32px' : sb.itemH;
+    const sbMine = { showBlock: mining || winH >= 600, mining, idle: !mining, title: mining ? 'Mining' : 'Idle', dot: mining ? '#2a5cf5' : '#d6d5cf', fg: mining ? '#2a5cf5' : SUB, sub: mining ? `${ms.wallet} · ${sess.blocks} block${sess.blocks === 1 ? '' : 's'} this session` : 'Not mining' };
+    const sbWal = {
+      has: !!sel, name: sel || 'No wallet', state: !sel ? 'None' : selUnl ? 'Unlocked' : 'Locked', fg: !sel ? SUB : selUnl ? OK : WARN, fill: selUnl ? 'transparent' : (sel ? WARN : 'transparent'),
+      btn: selUnl ? 'Lock' : 'Unlock', title: selUnl ? `Lock ${sel}` : `Unlock ${sel}`,
+      btnBg: selUnl ? '#ffffff' : INK, btnFg: selUnl ? INK : '#ffffff', btnBorder: selUnl ? '#d6d5cf' : INK,
+      act: () => (selUnl ? this.lockWallet(sel) : this.openWallet(sel))
+    };
+    const v = {}; VIEWS.forEach(([id]) => { v[id] = s.view === id; });
+    const headSub = {
+      overview: sel ? `${sel} · ${selUnl ? 'unlocked' : 'locked'}` : 'No wallet open',
+      send: 'Shadownet test LASER',
+      receive: sel ? sel : 'No wallet',
+      mining: mining ? `Mining with ${ms.wallet}` : 'Idle',
+      network: online ? `Height #${grp(st.height)}` : 'Node offline'
+    }[s.view];
+    const head = { num: String(vIdx + 1).padStart(2, '0'), label: VIEWS[vIdx][1], color: VIEWS[vIdx][2], sub: headSub };
+
+    // banner
+    let banner = { show: false };
+    const se = N.startup && N.startup.error;
+    if (offline && se && !N.lastOk) banner = { show: true, bg: '#fbeef0', border: '#efc6cf', fg: ERR, label: 'Node failed to start', text: se + ' Close other Laser processes, then restart Laser Core.', hasDetail: !!(N.startup.stderr || N.err), detail: [N.startup.stderr, N.err].filter(Boolean).join('\n') };
+    else if (offline) banner = { show: true, bg: '#fbeef0', border: '#efc6cf', fg: ERR, label: stale ? 'Reconnecting' : 'Node offline', text: stale ? `The local node stopped answering. Grey values were last updated at ${clock(N.lastOk)}. Retrying every 2 s.` : 'Waiting for the local RPC interface. Wallet balances and mining need the node.', hasDetail: !!N.err, detail: N.err || '' };
+    else if (online && pe && pe.peers === 0) banner = { show: true, bg: '#fbf3e6', border: '#ecd4b0', fg: WARN, label: 'No peers', text: `The local node is running but not connected to other Shadownet nodes${pe.connecting ? ` · ${pe.connecting} connection attempts in progress` : ''}.`, hasDetail: false };
+    else if (N.online === null && s.phase === 'main') banner = { show: true, bg: '#f4f4f1', border: '#e6e5e0', fg: SUB, label: 'Connecting', text: 'Contacting the local node…', hasDetail: false };
+    if(s.walletErr && !banner.show)banner={show:true,bg:'#fbf3e6',border:'#ecd4b0',fg:WARN,label:'Wallet list unavailable',text:s.walletErr,hasDetail:false};
+    banner.detailOpen = banner.show && banner.hasDetail && s.showDetail;
+    banner.detailLabel = s.showDetail ? 'Hide details' : 'Details';
+
+    // wallets
+    const walletOpts = s.wallets.map(n => ({ name: n, label: `${n} · ${s.unlocked[n] ? 'unlocked' : 'locked'}` }));
+    const noWallets = !s.wallets.length;
+    const wb = { openLabel: selUnl ? 'Refresh' : 'Unlock', openDisabled: !sel, lockDisabled: !selUnl };
+
+    // balance
+    const balState = noWallets || !sel ? 'none' : !selUnl ? 'locked' : !rec ? 'loading' : 'open';
+    const conf = met ? met.confirmed_photons : rec ? rec.balance_photons : null;
+    const pendKnown = !!met && !stale;
+    const pd = met ? BigInt(met.projected_photons) - BigInt(met.confirmed_photons) : null;
+    const bal = {
+      none: balState === 'none', locked: balState === 'locked', loading: balState === 'loading', open: balState === 'open', stale,
+      color: stale ? FAINT : INK, avail: amt(conf),
+      availSub: stale ? `Last known at ${clock(N.lastOk)} · node offline` : conf==null ? 'Balance unavailable from the node' : 'Confirmed on the active chain',
+      pendKnown, pendUnknown: !pendKnown, pend: amt(pd, true), pendColor: pd === null || pd === 0n ? INK : pd > 0n ? OK : INK,
+      pendSub: met ? `+${laser(met.pending_received_photons)} in · −${laser(met.pending_spent_photons)} out` : (stale ? 'Unknown while the node is offline' : s.metricsErr ? 'This node did not report mempool effects' : 'Waiting for node metrics'),
+      proj: amt(met ? met.projected_photons : null),
+      addr: rec ? short(rec.address) : '', addrFull: rec ? rec.address : '', nonce: rec ? rec.nonce : '—',
+      updated: N.lastOk ? `Updated ${clock(N.lastOk)}` : ''
+    };
+    const copied = s.now - s.copiedAt < 2500 && s.copiedAt > 0;
+    const copyLabel = copied ? 'Copied ✓' : 'Copy';
+
+    const ovNode = [
+      { k: 'State', v: online ? 'Online · RPC ready' : offline ? 'Offline' : 'Connecting…', vc: online ? OK : offline ? ERR : SUB },
+      { k: 'Height', v: st ? '#' + grp(st.height) : '—', vc: nv },
+      { k: 'Peers', v: pe ? `${pe.peers} established` : '—', vc: pe && pe.peers === 0 && online ? WARN : nv },
+      { k: 'Mempool', v: st ? `${st.mempool} tx` : '—', vc: nv },
+      { k: 'LF2-K8 observer', v: obs.v + ' · non-consensus', vc: obs.vc }
+    ];
+    const nextIn = sess && sess.next_run_at ? Math.max(0, Math.ceil((sess.next_run_at - s.now) / 1000)) : null;
+    const ovMine = [
+      { k: 'State', v: mining ? (nextIn === null ? 'Mining · solving' : `Mining · next cycle ${nextIn} s`) : 'Idle', vc: mining ? '#2a5cf5' : SUB },
+      { k: 'Wallet', v: ms && ms.wallet ? ms.wallet : '—', vc: INK },
+      { k: 'Backend', v: ms ? backendLabel(ms.backend) + (ms.backend === 'cuda' ? ' + CPU check' : '') : 'Detecting…', vc: INK },
+      { k: 'Session blocks', v: sess && sess.started_at ? grp(sess.blocks) : '—', vc: INK }
+    ];
+    const kindColor = { wallet: '#6a2cf0', mined: '#2a5cf5', chain: '#c9c8c1', send: '#c4237f', ok: OK, err: ERR };
+    const activity = s.activity.slice(0, compact ? 8 : 12).map(a => ({ time: clock(a.t), text: a.text, detail: a.detail, dot: kindColor[a.kind] || SUB, fg: a.kind === 'err' ? ERR : a.kind === 'chain' ? SUB : INK }));
+
+    // send
+    const c = this.sendCalc(), t = s.send.touched;
+    const toShow = (t.to || s.send.to.length >= 64) && c.toErr;
+    const sf = {
+      from: c.from,
+      count: `${c.to.length}/64`, countColor: c.to.length === 64 && !c.toErr ? OK : FAINT,
+      toInvalid: !!toShow, toBorder: toShow ? ERR : '#d6d5cf',
+      toMsg: toShow ? c.toErr : c.self ? 'This is the sending wallet’s own address.' : (!c.toErr ? (s.contacts.find(x => x.address === c.toL) || {}).label ? `Contact: ${s.contacts.find(x => x.address === c.toL).label}` : 'Valid address format.' : ''),
+      toMsgColor: toShow ? ERR : c.self ? WARN : OK,
+      amtInvalid: !!(t.amount && c.amtErr), amtBorder: t.amount && c.amtErr ? ERR : '#d6d5cf',
+      amtMsg: t.amount && c.amtErr ? c.amtErr : c.fundsErr || (c.a !== null && c.a > 0n ? `${grpS(c.a.toString())} photons` : ''),
+      amtMsgColor: (t.amount && c.amtErr) || c.fundsErr ? ERR : FAINT,
+      fromMsg: c.fromErr ? c.fromErr : c.avail !== null ? `Available ${laser(c.avail)} LASER` : 'Reading balance…',
+      fromColor: c.fromErr ? WARN : SUB, fromNeedsUnlock: c.fromLocked,
+      custom: s.send.fee === 'custom', feeBorder: s.send.fee === 'custom' && c.feeErr && s.send.feeCustom ? ERR : '#d6d5cf', feeMsg: s.send.fee === 'custom' && s.send.feeCustom ? (c.feeErr || '') : '',
+      saveDisabled: !!c.toErr || !s.send.label.trim(),
+      reviewDisabled: !!c.blocker || !!s.dlg,
+      blocker: c.blocker ? c.blocker : 'Ready to review. Nothing is signed until you confirm.', blockColor: c.blocker ? SUB : OK
+    };
+    const fees = FEES.map(([val, label]) => ({ label, v: val + ' LASER', on: s.send.fee === val, border: s.send.fee === val ? INK : '#e6e5e0', bg: s.send.fee === val ? '#f4f4f1' : '#ffffff', pick: () => this.setSend({ fee: val }) }))
+      .concat([{ label: 'Custom', v: s.send.fee === 'custom' && c.fee !== null ? dec(c.fee) : 'Set amount', on: s.send.fee === 'custom', border: s.send.fee === 'custom' ? INK : '#e6e5e0', bg: s.send.fee === 'custom' ? '#f4f4f1' : '#ffffff', pick: () => this.setSend({ fee: 'custom', feeCustom: s.send.feeCustom || '' }) }]);
+    const okV = x => x !== null && x !== undefined && !c.amtErr && !c.feeErr;
+    const sumRows = [
+      { k: 'Recipient receives', v: okV(c.recv) ? laser(c.recv) : '—', vc: INK, w: '500', title: okV(c.recv) ? amt(c.recv).full : '' },
+      { k: 'Fee', v: c.fee !== null && !c.feeErr ? laser(c.fee) : '—', vc: INK, w: '400', title: '' },
+      { k: 'Total debit', v: okV(c.debit) ? laser(c.debit) : '—', vc: c.fundsErr ? ERR : INK, w: '500', title: okV(c.debit) ? amt(c.debit).full : '' },
+      { k: 'Available', v: c.avail !== null ? laser(c.avail) : '—', vc: SUB, w: '400', title: '' },
+      { k: 'After sending', v: c.avail !== null && okV(c.debit) && !c.fundsErr ? laser(c.avail - c.debit) : '—', vc: SUB, w: '400', title: '' }
+    ];
+    const contacts = s.contacts.map(x => ({ ...x, removeLabel: `Remove ${x.label}`, use: () => this.setState(z => ({ send: { ...z.send, to: x.address, label: x.label, touched: { ...z.send.touched, to: true } } })), remove: () => { const list = this.state.contacts.filter(y => y.address !== x.address); this.saveContacts(list); this.setState({ contacts: list }); } }));
+
+    // receive
+    const rcState = noWallets || !sel ? 'none' : !selUnl ? 'locked' : 'open';
+    const rc = {
+      none: rcState === 'none', locked: rcState === 'locked', open: rcState === 'open' && !!rec,
+      groups: rec ? rec.address.match(/.{8}/g).map((g, i) => ({ t: g, c: i % 2 ? '#3a3c42' : INK })) : [],
+      aria: rec ? 'Address ' + rec.address : '',
+      copyMsg: s.copyErr ? s.copyErr : copied ? 'Full address copied to the clipboard.' : '', copyColor: s.copyErr ? ERR : OK
+    };
+
+    // mining
+    const mw = s.mineWallet, mwUnl = !!s.unlocked[mw];
+    const ivN = Number(s.intervalStr), ivOk = Number.isInteger(ivN) && ivN >= 1 && ivN <= 120;
+    const canStart = online && mwUnl && ivOk && !!mw;
+    const prereq = [
+      { ok: online, text: online ? 'Node online' : 'Node offline' },
+      { ok: mwUnl, text: !mw ? 'No wallet' : mwUnl ? `${mw} unlocked` : `${mw} is locked` },
+      { ok: !!(pe && pe.peers > 0), warn: true, text: pe ? `${pe.peers} peer${pe.peers === 1 ? '' : 's'}` : 'Peers unknown' }
+    ].map(p => ({ text: p.text, mark: p.ok ? '✓' : p.warn ? '!' : '✕', fg: p.ok ? OK : p.warn ? WARN : ERR }));
+    const sessActive = sess && sess.started_at && ms.wallet === mw;
+    const mc = {
+      wallet: mw, locked: mining || s.mineBusy || s.onceBusy,
+      ivBorder: ivOk ? '#d6d5cf' : ERR,
+      ivHelp: !ivOk ? 'Use a whole number from 1 to 120 seconds.' : mining ? 'Wallet and interval are locked while continuous mining runs. Stop mining to change them.' : 'The interval is the pause between mining cycles on this computer. It does not change the network’s 10-second block target.',
+      btnLabel: s.mineBusy ? (mining ? 'Stopping…' : 'Starting…') : mining ? 'Stop mining' : 'Start mining',
+      btnDisabled: s.mineBusy || s.onceBusy || (!mining && !canStart),
+      btnBg: mining ? '#ffffff' : INK, btnFg: mining ? INK : '#ffffff', btnBorder: mining ? INK : INK, btnDot: mining ? ERR : '#2a5cf5',
+      title: mining ? `Mining continuously with ${ms.wallet}` : !online ? 'Mining needs the local node' : !mw ? 'Create a wallet to mine' : !mwUnl ? `Unlock ${mw} to mine` : 'Ready to mine',
+      titleFg: mining ? '#2a5cf5' : INK,
+      sub: mining ? (nextIn === null ? 'Cycle in progress' : `Next cycle in ${nextIn} s`) + ` · every ${Math.round(ms.interval / 1000)} s` : !mwUnl && mw ? 'Opening a wallet never starts mining by itself.' : `PhotonHash v0.2 · ${ms ? backendLabel(ms.backend) : 'backend detecting'}`,
+      hasErr: !!s.mineErr,
+      sessSub: sessActive ? `${ms.wallet} · since ${clock(sess.started_at)}` : 'No session yet',
+      lifeSub: met ? `${sel} · from node metrics` : (selUnl ? 'Not reported' : 'Unlock a wallet')
+    };
+    let earned = null;
+    if (sessActive && met && met.wallet === ms.wallet && sess.baseline_total_photons != null) earned = BigInt(met.total_mined_photons) - BigInt(sess.baseline_total_photons);
+    const NR = 'Not reported';
+    const sessCells = [
+      { label: 'Elapsed', value: sessActive ? hms((mining ? s.now : (sess.last_block_at || s.now)) - sess.started_at) : '—', unit: '', vc: sessActive ? INK : FAINT },
+      { label: 'Blocks', value: sessActive ? grp(sess.blocks) : '—', unit: '', vc: sessActive ? INK : FAINT },
+      { label: 'Earned', value: earned !== null ? laser(earned) : sessActive ? NR : '—', unit: earned !== null ? 'LASER' : '', vc: earned !== null ? INK : FAINT, title: earned !== null ? amt(earned).full : 'Needs wallet mining metrics from the node' },
+      { label: 'Avg solve', value: sessActive && sess.blocks ? (sess.total_solve_ms / sess.blocks / 1000).toFixed(2) : '—', unit: sessActive && sess.blocks ? 's' : '', vc: sessActive ? INK : FAINT },
+      { label: 'Errors', value: sessActive ? grp(sess.errors) : '—', unit: '', vc: sessActive && sess.errors ? ERR : sessActive ? INK : FAINT },
+      { label: 'Next cycle', value: mining ? (nextIn === null ? 'Solving' : nextIn + ' s') : '—', unit: '', vc: mining ? INK : FAINT }
+    ];
+    const lv = (x, f) => met ? f(x) : (selUnl && s.metricsErr ? NR : '—');
+    const lc = met ? INK : FAINT;
+    const lifeCells = [
+      { label: 'Blocks mined', value: lv(met, m => grp(m.blocks_mined)), unit: '', vc: lc },
+      { label: 'Total earned', value: lv(met, m => laser(m.total_mined_photons)), unit: met ? 'LASER' : '', vc: lc, title: met ? amt(met.total_mined_photons).full : '' },
+      { label: 'Subsidy', value: lv(met, m => laser(m.subsidy_photons)), unit: met ? 'LASER' : '', vc: lc, title: met ? amt(met.subsidy_photons).full : '' },
+      { label: 'Fees', value: lv(met, m => laser(m.fee_photons)), unit: met ? 'LASER' : '', vc: lc, title: met ? amt(met.fee_photons).full : '' },
+      { label: 'Last mined', value: lv(met, m => m.has_last ? '#' + grp(m.last_height) : 'None yet'), unit: '', vc: lc },
+      { label: 'Next subsidy', value: lv(met, m => laser(m.next_reward_photons)), unit: met ? 'LASER' : '', vc: lc, title: met ? amt(met.next_reward_photons).full : '' }
+    ];
+    const sv = s.solves.slice(compact ? -24 : -40), mx = Math.max(1000, ...sv.map(x => x.ms));
+    const solve = {
+      empty: !sv.length, has: !!sv.length,
+      bars: sv.map((x, i) => ({ h: Math.max(4, Math.round(x.ms / mx * 72)) + 'px', c: i === sv.length - 1 ? '#6a2cf0' : '#2a5cf5', title: `${(x.ms / 1000).toFixed(2)} s · ${clock(x.t)}` })),
+      sub: sv.length ? `${sv.length} block${sv.length > 1 ? 's' : ''} · max ${(mx / 1000).toFixed(1)} s` : 'This session',
+      left: sv.length ? clock(sv[0].t) : '', right: sv.length ? clock(sv[sv.length - 1].t) : '',
+      aria: `Solve durations for ${sv.length} blocks mined this session`
+    };
+    const engineRows = [
+      { k: 'Block PoW', v: 'PhotonHash v0.2', vc: INK },
+      { k: 'Active backend', v: ms ? backendLabel(ms.backend) : 'Detecting…', vc: INK },
+      { k: 'CUDA helper', v: ms ? (ms.cuda_available ? 'Available' : 'Not detected') : '—', vc: ms && ms.cuda_available ? OK : SUB },
+      { k: 'CPU fallback', v: ms ? (ms.cpu_fallback ? 'On · verifies every candidate' : 'Off') : '—', vc: INK }
+    ];
+    const onceN = Number(s.onceStr), onceOk = Number.isInteger(onceN) && onceN >= 1 && onceN <= 100;
+    const once = {
+      disabled: mining || s.mineBusy || s.onceBusy, border: onceOk ? '#d6d5cf' : ERR,
+      btnDisabled: mining || s.mineBusy || s.onceBusy || !onceOk || !canStart,
+      label: s.onceBusy ? 'Mining…' : `Mine ${onceOk ? onceN : ''} block${onceN === 1 ? '' : 's'}`,
+      help: mining ? 'Unavailable while continuous mining runs.' : 'Mines a fixed number of blocks (1–100) with the mining wallet, without starting continuous mining.',
+      hasMsg: !!s.onceMsg, msg: s.onceMsg ? s.onceMsg.text : '', msgColor: s.onceMsg && s.onceMsg.err ? ERR : OK
+    };
+
+    // network
+    let net;
+    if (!online) net = { fg: N.online === null ? SUB : ERR, kicker: N.online === null ? 'Connecting' : 'Offline', title: N.online === null ? 'Contacting the local node' : se && !N.lastOk ? 'The local node did not start' : 'The local node is not answering', sub: N.online === null ? '' : stale ? `Last successful response at ${clock(N.lastOk)}. Laser Core keeps retrying.` : 'Peer and chain information is unavailable until the RPC interface responds.' };
+    else if (pe && pe.peers === 0) net = { fg: WARN, kicker: 'No peers', title: 'Running locally, not connected to Shadownet', sub: `${pe.connecting} connection attempt${pe.connecting === 1 ? '' : 's'} in progress · ${pe.known} known address${pe.known === 1 ? '' : 'es'} · discovery ${pe.discovery ? 'on' : 'off'}` };
+    else if(!pe) net={fg:WARN,kicker:'Peers unavailable',title:'Local node ready',sub:'The node answered, but peer diagnostics could not be read.'};
+    else net = { fg: OK, kicker: 'Connected', title: `Connected to ${pe.peers} Shadownet peer${pe.peers === 1 ? '' : 's'}`, sub: `${pe.outbound} outbound · ${pe.inbound} inbound · ${pe.connecting} connecting · local RPC ready` };
+    net.big = [{ k: 'Peers', v: pe && online ? grp(pe.peers) : '—', vc: pe && online ? (pe.peers ? INK : WARN) : FAINT }, { k: 'Height', v: st ? grp(st.height) : '—', vc: nv }, { k: 'Mempool', v: st ? grp(st.mempool) : '—', vc: nv }];
+    net.updated = N.lastOk ? (stale ? 'Stale · ' : '') + 'Updated ' + clock(N.lastOk) : 'No data';
+    const pv = k => pe ? (typeof pe[k] === 'boolean' ? (pe[k] ? 'On' : 'Off') : grp(pe[k])) : '—';
+    const peerRows = [['Established', 'peers'], ['Connecting', 'connecting'], ['Outbound', 'outbound'], ['Inbound', 'inbound'], ['Known addresses', 'known'], ['Peer discovery', 'discovery']].map(([k, key]) => ({ k, v: pv(key), vc: nv }));
+    const nodeRows = [
+      { k: 'State', v: online ? 'Online · RPC ready' : offline ? 'Offline' : 'Connecting…', vc: online ? OK : offline ? ERR : SUB },
+      { k: 'Network', v: 'Shadownet', vc: INK },
+      { k: 'Height', v: st ? '#' + grp(st.height) : '—', vc: nv },
+      { k: 'Blocks stored', v: st ? grp(st.blocks) : '—', vc: nv },
+      { k: 'Mempool', v: st ? grp(st.mempool) + ' tx' : '—', vc: nv },
+      { k: 'Orphan blocks', v: st ? grp(st.orphans) : '—', vc: nv }
+    ];
+    const diagCells = [['Penalties', 'penalties'], ['Bans', 'bans'], ['Rejects sent', 'rejects_sent'], ['Rejects received', 'rejects_received'], ['Queued inbound', 'queued_in'], ['Queued outbound', 'queued_out']].map(([label, k]) => ({ label, value: pv(k), vc: pe && pe[k] > 0 ? WARN : nv }));
+    net.diagSum = pe ? `${pe.penalties} penalties · ${pe.bans} bans` : 'Unavailable';
+    const cf = s.cfg || {};
+    const cfgRows = [['Network', cf.network], ['RPC', cf.rpc], ['Listen', cf.listen], ['Advertise', cf.advertise || 'Not set'], ['Data directory', cf.datadir], ['Channel · store', cf.channel ? `${cf.channel} · v${cf.storeVersion}` : null], ['CUDA miner helper', cf.cudaMiner || 'Not configured']].map(([k, val]) => ({ k, v: val == null ? '—' : String(val) }));
+
+    // status bar
+    const sbar = [
+      { text: online ? 'Node online' : offline ? 'Node offline' : 'Connecting', dot: online ? OK : offline ? ERR : '#c9c8c1', fg: online ? INK : offline ? ERR : SUB, r: '50%', title: online ? 'Local RPC ready. This is not a sync percentage.' : N.err || '' },
+      { text: pe && online ? `${pe.peers} peer${pe.peers === 1 ? '' : 's'}` : 'Peers —', dot: pe && online ? (pe.peers ? OK : WARN) : '#c9c8c1', fg: pe && online && !pe.peers ? WARN : SUB, r: '50%', title: 'Established peer connections' },
+      { text: st ? '#' + grp(st.height) : 'Height —', dot: 'transparent', fg: online ? INK : FAINT, r: '0', title: 'Local chain height' }
+    ];
+    if (!compact) sbar.push({ text: st ? `Mempool ${st.mempool}` : 'Mempool —', dot: 'transparent', fg: online ? SUB : FAINT, r: '0', title: 'Transactions waiting in the local mempool' });
+    sbar.push({ text: mining ? `Mining · ${ms.wallet}` : 'Miner idle', dot: mining ? '#2a5cf5' : '#d6d5cf', fg: mining ? '#2a5cf5' : SUB, r: '0', title: 'Continuous mining' });
+    const sbarRight = winW >= 1000 ? (N.lastOk ? `Updated ${ago(s.now - N.lastOk)}` : '') : '';
+
+    // dialog
+    const D = s.dlg;
+    let d = { open: !!D };
+    if (D && D.type === 'name') {
+      const val = D.value || '', live = val.length > 0 && !NAME.test(val.trim()) ? 'Only letters, numbers and underscores.' : (s.wallets.includes(val.trim()) ? `“${val.trim()}” already exists.` : null);
+      const err = D.err || live;
+      d = { open: true, isName: true, kc: '#6a2cf0', kicker: D.mode === 'create' ? 'New wallet · step 1 of 2' : 'Restore backup', title: D.mode === 'create' ? 'Name your wallet' : 'Restore an encrypted backup', msg: D.mode === 'create' ? 'The name is used locally for the wallet file and in this app.' : 'Choose a new local name. Next, a file picker opens so you can select the .key backup. The restored wallet stays locked until you unlock it with its original passphrase.', nameLabel: D.mode === 'create' ? 'Wallet name' : 'Name for the restored wallet', value: val, invalid: !!err, border: err ? ERR : '#d6d5cf', help: err || `${val.length}/64 · letters, numbers and underscores`, helpColor: err ? ERR : SUB, busy: !!D.busy, submit: D.busy ? 'Choosing file…' : D.mode === 'create' ? 'Continue' : 'Choose backup file…' };
+    } else if (D && D.type === 'pass') {
+      const cr = D.mode === 'create';
+      const mism = cr && D.p2 && D.p1 !== D.p2;
+      d = { open: true, isPass: true, kc: cr ? '#6a2cf0' : WARN, kicker: cr ? 'New wallet · step 2 of 2' : 'Unlock wallet', title: cr ? `Set a passphrase for ${D.name}` : `Unlock ${D.name}`, msg: cr ? 'The passphrase encrypts the wallet file. It cannot be reset or recovered, so store it somewhere safe.' : 'Enter the passphrase this wallet was created with. Unlocking does not start mining.', p1: D.p1, p2: D.p2, confirm: cr, ac: cr ? 'new-password' : 'current-password', invalid: !!D.err, border: D.err && !mism ? ERR : '#d6d5cf', border2: mism ? ERR : '#d6d5cf', help: D.err || (mism ? 'The passphrases do not match yet.' : 'Used locally to unlock the encrypted wallet. Never sent to peers.'), helpColor: D.err || mism ? ERR : SUB, helpRole: D.err ? 'alert' : undefined, busy: !!D.busy, submit: D.busy ? (cr ? 'Creating…' : 'Unlocking…') : cr ? 'Create wallet' : 'Unlock' };
+    } else if (D && D.type === 'created') {
+      d = { open: true, isCreated: true, kc: OK, kicker: 'Wallet created', title: `${D.name} is ready and unlocked`, msg: `Address ${short(D.address)}. Its balance is zero until it receives or mines LASER.`, path: (s.cfg?.walletDir || '%APPDATA%\\Laser Core\\wallets')+'\\'+D.name+'.key' };
+    } else if (D && D.type === 'review') {
+      const ctc = s.contacts.find(x => x.address === D.to);
+      const rows = [{ k: 'From wallet', v: D.from, w: '500' }, { k: 'Recipient', v: D.to, w: '400' }];
+      if (ctc || D.label) rows.push({ k: 'Label', v: (ctc && ctc.label) || D.label, w: '400' });
+      rows.push({ k: 'Recipient receives', v: laser(D.recv) + ' LASER', w: '500' }, { k: 'Fee', v: laser(D.fee) + ' LASER', w: '400' }, { k: 'Total debit', v: laser(D.debit) + ' LASER', w: '600' });
+      d = { open: true, isReview: true, kc: '#c4237f', kicker: 'Review transaction', title: `Send ${laser(D.recv)} LASER`, msg: D.subtract ? 'The fee is subtracted from the amount you entered.' : 'Check the full recipient address before signing.', rows, busy: !!D.busy, submit: D.busy ? 'Signing and submitting…' : 'Sign and send' };
+    } else if (D && D.type === 'sent') {
+      d = D.ok
+        ? { open: true, isResult: true, kc: OK, kicker: 'Accepted by local node', title: `${laser(D.recv)} LASER submitted`, msg: 'The node accepted the transaction. It is not confirmed until a miner includes it in a block; until then it shows as a pending debit.', rows: [{ k: 'To', v: short(D.to) }, { k: 'Total debit', v: laser(D.debit) + ' LASER' }], hasOut: !!D.out, out: D.out, outColor: SUB, doneLabel: 'Done', done: () => this.setState(z => ({ dlg: null, send: { ...z.send, to: '', label: '', amount: '', touched: {} } })) }
+        : { open: true, isResult: true, kc: ERR, kicker: 'Not sent', title: 'The node did not accept this transaction', msg: 'Your form is kept so you can correct it and try again.', rows: [], hasOut: true, out: D.out, outColor: ERR, doneLabel: 'Back to form', done: () => this.setState({ dlg: null }) };
+    }
+
+    const desk = fixed ? { bg: '#e4e3de', pad: '32px', h: 'auto' } : { bg: '#f8f8f6', pad: '0', h: '100vh' };
+    if (s.phase === 'splash' && !fixed) { desk.bg = '#e4e3de'; desk.pad = '32px'; }
+    const win = fixed ? { w: winW + 'px', h: winH + 'px', border: '1px solid #c9c8c1', shadow: '0 24px 60px rgba(14,15,18,0.16)' } : { w: '100%', h: '100vh', border: 'none', shadow: 'none' };
+
+    return {
+      showPreviewNote:false, buildLabel: N.startup ? 'v'+(N.startup.appVersion||'0.2.0-beta.1')+' · channel '+N.startup.channel : 'Starting…',
+      isSplash: s.phase === 'splash', isMain: s.phase === 'main', sp, desk, win,
+
+      nav, sb, sbMine, sbWal, head, v, banner, showDetail: s.showDetail, toggleDetail: () => this.setState(z => ({ showDetail: !z.showDetail })),
+      selected: sel, walletOpts, noWallets, wb, bal, copyLabel, copyAddr: () => this.copyAddr(),
+      walletBackupPath: (s.cfg?.walletDir || '%APPDATA%\\Laser Core\\wallets')+'\\<name>.key',
+      onSelect: e => this.selectWallet(e.target.value),
+      openSelected: () => (selUnl ? this.refreshSelected() : this.openWallet(sel)),
+      lockSelected: () => this.lockWallet(sel),
+      openCreate: () => this.showDialog({ type: 'name', mode: 'create', value: '', err: null }),
+      openRestore: () => this.showDialog({ type: 'name', mode: 'restore', value: '', err: null }),
+      goNetwork: () => this.setState({ view: 'network' }), goMining: () => this.setState({ view: 'mining' }),
+      beamRef: this.beamRef,
+      beam: { dot: !online ? '#c9c8c1' : mining ? '#2a5cf5' : OK, mineLabel: !online ? 'Node offline' : mining ? (sess && !sess.next_run_at ? 'Solving · cycle in progress' : `Waiting · next cycle in ${nextIn} s`) : `Idle · PhotonHash v0.2 · ${ms ? backendLabel(ms.backend) : 'detecting'}`, mineFg: mining && online ? '#2a5cf5' : SUB, mineDot: !online ? '#c9c8c1' : mining ? '#2a5cf5' : '#d6d5cf', mineFoot: sess && sess.started_at ? `${grp(sess.blocks)} block${sess.blocks === 1 ? '' : 's'} this session · ledger row below the staircase` : 'Decorative · pixels are not hashrate', sendLabel: !online ? 'Node offline · sending unavailable' : 'Shadownet test LASER · no monetary value', recvLabel: !online ? 'Node offline' : sel ? `${sel} · ${selUnl ? 'receiving address' : 'locked'}` : 'No wallet', label: !online ? 'Node offline' : mining ? `Mining · ${ms.wallet} · #${grp(st && st.height)}` : `Shadownet · #${grp(st && st.height)} · ${pe ? pe.peers : 0} peers` },
+      ovNode, ovMine, activity, actEmpty: !s.activity.length,
+      cols: { first: two ? 'minmax(0,1.2fr) minmax(0,1fr)' : 'minmax(0,1fr)', bal: two ? 'minmax(0,1.35fr) minmax(0,1fr)' : 'minmax(0,1fr)', balBorder: two ? '1px solid #efeee9' : 'none', two: two ? 'minmax(0,1fr) minmax(0,1fr)' : 'minmax(0,1fr)', send: cw >= 860 ? 'minmax(0,1fr) 290px' : 'minmax(0,1fr)', amt: cw >= 620 ? 'minmax(0,1fr) minmax(0,1fr)' : 'minmax(0,1fr)' },
+      send: s.send, sf, fees, sumRows, contacts, contactsEmpty: !contacts.length,
+      on: {
+        to: e => this.setSend({ to: e.target.value.replace(/\s+/g, '') }), toBlur: () => this.touch('to'),
+        label: e => this.setSend({ label: e.target.value }),
+        amount: e => this.setSend({ amount: e.target.value.replace(/,/g, '').trim() }), amountBlur: () => this.touch('amount'),
+        subtract: e => this.setSend({ subtract: e.target.checked }),
+        from: e => this.setSend({ from: e.target.value }),
+        feeCustom: e => this.setSend({ feeCustom: e.target.value.trim() })
+      },
+      unlockFrom: () => this.openWallet(c.from),
+      saveContact: () => { if (c.toErr || !s.send.label.trim()) return; const list = s.contacts.filter(x => x.address !== c.toL).concat([{ label: s.send.label.trim(), address: c.toL }]); this.saveContacts(list); this.setState({ contacts: list }); this.toast(`Saved ${s.send.label.trim()} to the address book.`); },
+      clearSend: () => this.setState(z => ({ send: { ...z.send, to: '', label: '', amount: '', subtract: false, touched: {} } })),
+      review: () => { const k = this.sendCalc(); if (k.blocker) { this.setSend({ touched: { to: true, amount: true } }); return; } this.showDialog({ type: 'review', from: k.from, to: k.toL, label: s.send.label.trim(), recv: k.recv, fee: k.fee, debit: k.debit, subtract: s.send.subtract, busy: false }); },
+      cancelReview: () => this.closeDlg(), confirmSend: () => this.confirmSend(),
+      rc,
+      mc, prereq, sessCells, lifeCells, solve, engineRows, once, mineErr: s.mineErr, intervalStr: s.intervalStr, onceStr: s.onceStr,
+      onMineWallet: e => this.setState({ mineWallet: e.target.value, mineErr: null }),
+      onInterval: e => this.setState({ intervalStr: e.target.value }),
+      onOnce: e => this.setState({ onceStr: e.target.value, onceMsg: null }),
+      mineToggle: () => this.mineToggle(), mineStop: () => this.mineStop(), mineOnce: () => this.mineOnce(),
+      net, obs, peerRows, nodeRows, diagCells, cfgRows,
+      sbar, sbarRight,
+      toast: { show: !!s.toast, text: s.toast ? s.toast.text : '', dot: s.toast ? s.toast.dot : OK }, closeToast: () => this.setState({ toast: null }),
+      d, backdrop: () => { if (!(s.dlg && (s.dlg.busy || s.dlg.type === 'review'))) this.closeDlg(); }, stopProp: e => e.stopPropagation(),
+      closeDlg: () => this.closeDlg(),
+      nameSubmit: e => this.nameSubmit(e), passSubmit: e => this.passSubmit(e),
+      onDlgName: e => this.setState(z => ({ dlg: { ...z.dlg, value: e.target.value, err: null } })),
+      onP1: e => this.setState(z => ({ dlg: { ...z.dlg, p1: e.target.value, err: null } })),
+      onP2: e => this.setState(z => ({ dlg: { ...z.dlg, p2: e.target.value, err: null } })),
+      createdReceive: () => this.setState({ dlg: null, view: 'receive' })
+    };
+  }
+}

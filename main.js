@@ -11,6 +11,7 @@ const {
 const { execFile, execFileSync, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { parseExactJSON } = require('./exact-json');
 const { pathToFileURL } = require('url');
 const {
   buildNodeArgs,
@@ -78,12 +79,22 @@ const LASER_RENDERER_RESOURCES = new Map([
   ['/splash.html', 'splash.html'],
   ['/style.css', 'style.css'],
   ['/app.js', 'app.js'],
+  ['/template.js', 'template.js'],
+  ['/vendor/react-18.3.1.min.js', 'vendor/react-18.3.1.min.js'],
+  ['/vendor/react-dom-18.3.1.min.js', 'vendor/react-dom-18.3.1.min.js'],
+  ['/assets/laser-vector.svg', 'assets/laser-vector.svg'],
+  ['/assets/Michroma-Regular.ttf', 'assets/Michroma-Regular.ttf'],
+  ['/assets/Geist-Regular.ttf', 'assets/Geist-Regular.ttf'],
+  ['/assets/Geist-Medium.ttf', 'assets/Geist-Medium.ttf'],
+  ['/assets/Geist-Semibold.ttf', 'assets/Geist-Semibold.ttf'],
+  ['/assets/GeistMono-Regular.ttf', 'assets/GeistMono-Regular.ttf'],
+  ['/assets/GeistMono-Medium.ttf', 'assets/GeistMono-Medium.ttf'],
   ['/splash.js', 'splash.js'],
   ['/logo.png', 'logo.png']
 ]);
 
 function registerRendererProtocol() {
-  protocol.handle(LASER_RENDERER_SCHEME, request => {
+  protocol.handle(LASER_RENDERER_SCHEME, async request => {
     const requestUrl = new URL(request.url);
     const fileName = requestUrl.host === 'app' &&
       request.method === 'GET' &&
@@ -96,9 +107,12 @@ function registerRendererProtocol() {
         headers: { 'content-type': 'text/plain; charset=utf-8' }
       });
     }
-    return net.fetch(pathToFileURL(
+    const response = await net.fetch(pathToFileURL(
       path.join(__dirname, 'renderer', fileName)
     ).href);
+    const headers = new Headers(response.headers);
+    headers.set('Content-Security-Policy', "frame-ancestors 'none'");
+    return new Response(response.body, { status: response.status, headers });
   });
 }
 
@@ -465,7 +479,7 @@ function createWindow() {
       navigateOnDragDrop: false
     },
     autoHideMenuBar: false,
-    backgroundColor: '#f0f0f0'
+    backgroundColor: '#f8f8f6'
   });
 
   const menuTemplate = [
@@ -656,7 +670,7 @@ async function waitForNodeReady(timeoutMs = 300000) {
         'node', 'status', '--rpc', LASER_RPC,
         '--datadir', LASER_DATADIR, '--network', LASER_NETWORK, '--json'
       ], 1800);
-      const status = JSON.parse(raw);
+      const status = parseExactJSON(raw);
       updateMiningBackend(status);
       nodeReady = true;
       updateSplash('Node ready at height ' + status.height, 100);
@@ -674,6 +688,7 @@ async function waitForNodeReady(timeoutMs = 300000) {
 }
 
 registerMainHandler('laser:startup', () => ({
+  appVersion: app.getVersion(),
   ready: nodeReady,
   error: nodeStartupError,
   stderr: nodeStderr,
@@ -697,7 +712,7 @@ registerMainHandler('laser:status', async () => {
     'node', 'status', '--rpc', LASER_RPC,
     '--datadir', LASER_DATADIR, '--network', LASER_NETWORK, '--json'
   ]);
-  const status = JSON.parse(raw);
+  const status = parseExactJSON(raw);
   updateMiningBackend(status);
   return { ...status, shadow: currentShadowState() };
 });
@@ -707,7 +722,7 @@ registerMainHandler('laser:peers', async () => {
     'peer', 'list', '--rpc', LASER_RPC,
     '--datadir', LASER_DATADIR, '--network', LASER_NETWORK, '--json'
   ]);
-  return JSON.parse(raw);
+  return parseExactJSON(raw);
 });
 
 async function openWalletRecord(requestedName, passphrase, requireExisting) {
@@ -733,15 +748,15 @@ async function openWalletRecord(requestedName, passphrase, requireExisting) {
   for (const line of lines) {
     if (line.startsWith('Address:')) address = line.replace('Address:', '').trim();
   }
-  let balance = 0, nonce = 0;
+  let balance = null, nonce = null;
   try {
     const balOut = await walletCommand([
       'node', 'balance', name, '--rpc', LASER_RPC,
       '--datadir', LASER_DATADIR, '--network', LASER_NETWORK, '--json'
     ], name);
-    const parsed = JSON.parse(balOut);
-    balance = parsed.balance_photons || 0;
-    nonce = parsed.nonce || 0;
+    const parsed = parseExactJSON(balOut);
+    balance = parsed.balance_photons ?? null;
+    nonce = parsed.nonce ?? null;
   } catch (_) {}
   return { name, address, balance_photons: balance, nonce };
 }
@@ -808,7 +823,7 @@ async function queryMinerMetrics(wallet) {
     'node', 'miner', name, '--rpc', LASER_RPC,
     '--datadir', LASER_DATADIR, '--network', LASER_NETWORK, '--json'
   ], name);
-  return JSON.parse(raw);
+  return parseExactJSON(raw);
 }
 
 registerMainHandler('laser:miner-metrics', async (_event, wallet) => {
@@ -1010,6 +1025,7 @@ registerMainHandler('laser:config', () => {
     listen: LASER_LISTEN,
     advertise: LASER_ADVERTISE,
     datadir: LASER_DATADIR,
+    walletDir: path.join(LASER_CWD, 'wallets'),
     channel: runtime.channel,
     storeVersion: runtime.storeVersion,
     peers: LASER_PEERS,
@@ -1028,7 +1044,7 @@ function createSplash() {
     transparent: false,
     alwaysOnTop: true,
     center: true,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#fbfbf9',
     webPreferences: {
       preload: path.join(__dirname, 'splash-preload.js'),
       contextIsolation: true,

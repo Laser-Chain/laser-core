@@ -10,6 +10,10 @@ owner first adopts and commits an applicable project license.
 
 Bundled components retain their own terms:
 
+- React and ReactDOM 18.3.1: MIT license. See renderer/vendor/REACT-LICENSE.txt.
+- Geist and Geist Mono: SIL Open Font License 1.1. See
+  renderer/assets/Geist-OFL.txt and renderer/assets/GeistMono-OFL.txt.
+- Michroma: SIL Open Font License 1.1. See renderer/assets/Michroma-OFL.txt.
 - Electron: MIT license. Electron's license and Chromium's third-party license
   notices are embedded in the packaged runtime as LICENSE.electron.txt and
   LICENSES.chromium.html.

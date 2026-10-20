@@ -13,10 +13,8 @@ const rendererSource = fs.readFileSync(
 );
 
 test('wallet loading never starts mining', () => {
-  const calls = [...rendererSource.matchAll(/window\.laser\.mineStart\(/g)];
-  const explicitToggle = rendererSource.indexOf(
-    "document.getElementById('btn-mine-toggle').addEventListener"
-  );
+  const calls = [...rendererSource.matchAll(/this\.m\.mineStart\(/g)];
+  const explicitToggle = rendererSource.indexOf('async mineToggle()');
 
   assert.equal(calls.length, 1);
   assert.ok(explicitToggle >= 0);

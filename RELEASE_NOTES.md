@@ -1,4 +1,20 @@
-# Laser Core 0.2.0-beta.1 candidate notes
+# Laser Core release notes
+
+## Unreleased: desktop redesign
+
+- Native Electron Overview, Send, Receive, Mining, and Network views, with a
+  matching startup screen and locally bundled fonts and React runtime.
+- Static renderer generation from `ui-src/`, without a runtime template
+  evaluator or a preview HTTP server in the application.
+- Exact photon amounts through native JSON, IPC, balance display, and payment
+  validation; unavailable balances remain unknown instead of appearing as zero.
+- Fresh wallet and balance checks before signing, duplicate-submit protection,
+  pending-spend accounting, and reconciliation of wallet locks and expiry.
+- Renderer workflow tests and automated checks for generated-source drift.
+
+These source changes do not replace the previously published beta binaries.
+
+## Laser Core 0.2.0-beta.1 candidate notes
 
 Laser Core is a Windows x64 desktop full-node wallet and mining client for the
 experimental Laser Shadownet. This candidate is testnet software only. Do not

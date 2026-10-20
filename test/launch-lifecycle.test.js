@@ -13,9 +13,10 @@ const rendererSource = fs.readFileSync(
 );
 
 test('startup leaves encrypted wallets locked until an explicit user action', () => {
-  assert.match(rendererSource, /refreshWalletList\(preferredWallet\)/);
-  assert.doesNotMatch(rendererSource, /openWallet\(preferredWallet\)/);
-  assert.doesNotMatch(rendererSource, /walletOpen\(preferredWallet\)/);
+  const startup = rendererSource.slice(rendererSource.indexOf('async openMain()'), rendererSource.indexOf('async poll()'));
+  assert.match(startup, /refreshWallets/);
+  assert.doesNotMatch(startup, /walletOpen\(/);
+  assert.doesNotMatch(startup, /mineStart\(/);
 });
 
 test('splash and main windows open centered', () => {

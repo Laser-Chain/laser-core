@@ -140,10 +140,34 @@ npm run verify:release -- -ReleaseDir <release-directory>
 
 ## Development
 
+The current source includes the redesigned native Electron interface, with
+Overview, Send, Receive, Mining, and Network views. It uses the existing
+sandboxed preload bridge and bundled assets. Photon amounts stay exact across
+the native JSON and renderer boundary, and sending rechecks the unlocked
+wallet and spendable balance before signing.
+
+![Laser Core redesigned interface](docs/laser-core.png)
+
+*Example Shadownet wallet data. This source preview does not change the
+previously published release binaries.*
+
 ```powershell
 npm ci
 npm test
 ```
+
+Edit the source files in [ui-src](ui-src/README.md), then regenerate the
+checked-in renderer with Python 3 available:
+
+```powershell
+npm run build:ui
+npm test
+npm start
+```
+
+With the native runtimes staged, `npm run dist:redesign` produces a local
+portable preview in `dist/redesign/`. Use the release workflow below when
+preparing a distributable release.
 
 Packaging also requires a compatible Laser node source checkout. Set
 `LASER_SOURCE_DIR` to that checkout, build its Windows node binaries, prepare

@@ -1,27 +1,21 @@
 'use strict';
-
-const messages = [
-  { text: 'Starting node…', delay: 0 },
-  { text: 'Binding RPC interface…', delay: 800 },
-  { text: 'Connecting to peers…', delay: 1600 },
-  { text: 'Synchronizing blocks…', delay: 2400 },
-  { text: 'Preparing wallet interface…', delay: 3000 }
-];
-
-const statusElement = document.getElementById('splash-status');
-const progressElement = document.getElementById('splash-progress');
-let hasLiveStatus = false;
-
-for (const message of messages) {
-  setTimeout(() => {
-    if (!hasLiveStatus) statusElement.textContent = message.text;
-  }, message.delay);
-}
-
-window.laserSplash.onStatus(status => {
-  hasLiveStatus = true;
-  statusElement.textContent = String(status.text || 'Starting node…');
-  progressElement.style.animation = 'none';
-  const percent = Number.isFinite(status.progress) ? status.progress : 0;
-  progressElement.style.width = Math.max(0, Math.min(100, percent)) + '%';
+const statusElement=document.getElementById('splash-status');
+const progressElement=document.getElementById('splash-progress');
+const logElement=document.getElementById('splash-log');
+const startedAt=Date.now(), history=[];
+const colors=['#6a2cf0','#2a5cf5','#0a84c8','#00897d','#3f9a2e','#c4237f'];
+const cells=Array.from({length:40},()=>{const cell=document.createElement('span');progressElement.append(cell);return cell;});
+const tick=setInterval(()=>{const seconds=Math.floor((Date.now()-startedAt)/1000);document.getElementById('splash-elapsed').textContent=String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0');},1000);
+window.addEventListener('unload',()=>clearInterval(tick));
+window.laserSplash.onStatus(status=>{
+  const message=String(status.text||'Starting Laser Core…');
+  if(history.at(-1)!==message)history.push(message);
+  statusElement.textContent=message;
+  const failed=/failed|unavailable|error/i.test(message);
+  statusElement.style.color=failed?'#a1203d':'#0e0f12';
+  const progress=Math.max(0,Math.min(100,Number.isFinite(status.progress)?status.progress:0));
+  progressElement.setAttribute('aria-valuenow',String(progress));
+  cells.forEach((cell,i)=>{cell.style.background=i<Math.round(progress/100*40)?(failed?'#c9c8c1':colors[Math.min(5,Math.floor(i/40*6))]):'#ecebe6';});
+  logElement.replaceChildren(...history.slice(0,-1).slice(-2).map(text=>{const row=document.createElement('div');row.textContent=text;return row;}));
 });
+window.laserSplash.identity().then(identity=>{document.getElementById('splash-identity').textContent='v'+identity.appVersion+' · '+(identity.network==='shadow'?'Shadownet':identity.network);}).catch(()=>{});

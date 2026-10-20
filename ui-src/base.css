@@ -1,0 +1,31 @@
+
+@font-face{font-family:Geist;src:url('assets/Geist-Regular.ttf') format('truetype');font-weight:400;font-display:swap}
+@font-face{font-family:Geist;src:url('assets/Geist-Medium.ttf') format('truetype');font-weight:500;font-display:swap}
+@font-face{font-family:Geist;src:url('assets/Geist-Semibold.ttf') format('truetype');font-weight:600;font-display:swap}
+@font-face{font-family:'Geist Mono';src:url('assets/GeistMono-Regular.ttf') format('truetype');font-weight:400;font-display:swap}
+@font-face{font-family:'Geist Mono';src:url('assets/GeistMono-Medium.ttf') format('truetype');font-weight:500;font-display:swap}
+@font-face{font-family:Michroma;src:url('assets/Michroma-Regular.ttf') format('truetype');font-weight:400;font-display:swap}
+*{box-sizing:border-box}
+html,body{margin:0;background:#f8f8f6;color:#0e0f12;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+a{color:#0e0f12;text-decoration:underline;text-decoration-color:#c9c8c1;text-underline-offset:3px}
+a:hover{color:#2a5cf5;text-decoration-color:currentColor}
+:focus-visible{outline:2px solid #0e0f12;outline-offset:2px}
+::selection{background:#0e0f12;color:#fbfbf9}
+button,input,select{font-family:inherit}
+button:disabled,select:disabled,input:disabled{opacity:.42;cursor:not-allowed!important}
+input::placeholder{color:#a9aab0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.splash{width:480px;height:320px;overflow:hidden;background:#fbfbf9;padding:24px 26px 20px;display:flex;flex-direction:column;-webkit-app-region:drag;border:1px solid #e6e5e0}
+.splash-heading{display:flex;align-items:center;justify-content:space-between;font:10px 'Geist Mono',monospace;color:#62646b;text-transform:uppercase}
+.splash-heading img{height:20px;filter:brightness(0)}
+.splash h1{margin:22px 0 0;font-size:36px;font-weight:500;letter-spacing:-.045em}
+.splash h1 span{font:400 .8em Michroma,sans-serif;color:#00897d}
+.splash-subtitle{margin:8px 0;font:11px 'Geist Mono',monospace;text-transform:uppercase;letter-spacing:.08em;color:#62646b}
+.splash-progress-area{margin-top:auto}
+#splash-progress{display:grid;grid-template-columns:repeat(40,minmax(0,1fr));gap:2px;height:7px}
+#splash-progress span{background:#ecebe6}
+.splash-status-row{margin-top:12px;display:flex;align-items:baseline;gap:12px;font-size:13px;font-weight:500}
+#splash-status{flex:1;max-height:55px;overflow:auto;overflow-wrap:anywhere;-webkit-app-region:no-drag}
+#splash-elapsed{font:10.5px 'Geist Mono',monospace;color:#62646b}
+#splash-log{min-height:30px;margin-top:8px;font:10.5px/1.5 'Geist Mono',monospace;color:#8a8b90}
+#splash-log div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

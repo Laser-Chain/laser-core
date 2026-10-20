@@ -1,0 +1,711 @@
+
+
+
+<div style="min-height:100vh;height:{{ desk.h }};background:{{ desk.bg }};display:flex;flex-direction:column;align-items:center;gap:14px;padding:{{ desk.pad }};overflow:auto">
+
+<sc-if value="{{ isMain }}" hint-placeholder-val="{{ true }}">
+<div data-screen-label="Laser Core window" style="margin:auto;width:{{ win.w }};height:{{ win.h }};flex:none;position:relative;display:flex;flex-direction:column;background:#f8f8f6;border:{{ win.border }};box-shadow:{{ win.shadow }};overflow:hidden">
+
+  <div role="note" style="height:26px;flex:none;background:#0e0f12;color:#fbfbf9;display:flex;align-items:center;gap:12px;padding:0 14px;font:400 10.5px 'Geist Mono',monospace;white-space:nowrap;overflow:hidden">
+    <span style="display:flex;align-items:center;gap:7px;letter-spacing:0.1em;text-transform:uppercase"><span style="width:6px;height:6px;background:#c4237f;display:block"></span>Shadownet</span>
+    <span style="color:#c9cad0;overflow:hidden;text-overflow:ellipsis">Test network. Coins have no value and history can reset.</span>
+    <span style="margin-left:auto;color:#8a8b90">{{ buildLabel }}</span>
+  </div>
+
+  <div style="flex:1;min-height:0;display:flex">
+
+    <aside aria-label="Laser Core navigation" style="width:{{ sb.w }};flex:none;border-right:1px solid #e6e5e0;background:#fbfbf9;display:flex;flex-direction:column;min-height:0;overflow:auto">
+      <div style="height:50px;flex:none;display:flex;align-items:center;justify-content:{{ sb.justify }};gap:9px;padding:0 16px;border-bottom:1px solid #e6e5e0;font-family:'Geist Mono',monospace">
+        <img src="assets/laser-vector.svg" alt="Laser Core" style="height:16px;width:auto;display:block;filter:brightness(0)">
+        <sc-if value="{{ sb.wide }}" hint-placeholder-val="{{ true }}"><span style="font-size:14px;font-weight:500;letter-spacing:-0.02em">laser</span><span style="font-size:14px;color:#a9aab0;letter-spacing:-0.02em;margin-left:-3px">/ core</span></sc-if>
+      </div>
+      <nav aria-label="Views" style="padding:8px;display:flex;flex-direction:column;gap:2px">
+        <sc-for list="{{ nav }}" as="n" hint-placeholder-count="5">
+          <button onClick="{{ n.go }}" aria-current="{{ n.aria }}" title="{{ n.title }}" style="display:flex;flex-direction:{{ sb.dir }};align-items:center;justify-content:{{ sb.justify }};gap:{{ sb.gap }};height:{{ sb.itemH }};padding:0 10px;border:1px solid {{ n.border }};background:{{ n.bg }};border-radius:3px;cursor:pointer;color:{{ n.color }};text-align:left" style-hover="background:#ffffff;color:#0e0f12">
+            <span style="width:7px;height:7px;background:{{ n.dot }};display:block;flex:none"></span>
+            <span style="flex:{{ sb.labelFlex }};font:500 {{ sb.fs }} 'Geist',sans-serif">{{ n.label }}</span>
+            <sc-if value="{{ sb.wide }}" hint-placeholder-val="{{ true }}"><span style="font:400 10px 'Geist Mono',monospace;color:#a9aab0">{{ n.key }}</span></sc-if>
+          </button>
+        </sc-for>
+      </nav>
+
+      <div style="margin-top:auto;border-top:1px solid #e6e5e0">
+        <sc-if value="{{ sb.wide }}" hint-placeholder-val="{{ true }}">
+          <sc-if value="{{ sbMine.showBlock }}" hint-placeholder-val="{{ true }}">
+          <div style="padding:12px 14px;border-bottom:1px solid #e6e5e0;display:grid;gap:6px">
+            <div style="display:flex;align-items:center;justify-content:space-between;font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b"><span>Miner</span><span style="display:flex;align-items:center;gap:6px;color:{{ sbMine.fg }}"><span style="width:6px;height:6px;background:{{ sbMine.dot }};display:block"></span>{{ sbMine.title }}</span></div>
+            <div style="font-size:12px;line-height:1.4;color:#62646b">{{ sbMine.sub }}</div>
+            <sc-if value="{{ sbMine.mining }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ mineStop }}" style="height:28px;border:1px solid #d6d5cf;background:#ffffff;color:#0e0f12;border-radius:3px;font:500 10px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer" style-hover="background:#f4f4f1">Stop mining</button>
+            </sc-if>
+          </div>
+          </sc-if>
+          <div style="padding:{{ sb.walPad }};display:grid;gap:6px">
+            <div style="font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b">Active wallet</div>
+            <div title="{{ sbWal.name }}" style="font:500 13.5px 'Geist',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ sbWal.name }}</div>
+            <div style="display:flex;align-items:center;gap:6px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;color:{{ sbWal.fg }}"><span style="width:6px;height:6px;border:1.5px solid {{ sbWal.fg }};background:{{ sbWal.fill }};display:block"></span>{{ sbWal.state }}</div>
+            <sc-if value="{{ sbWal.has }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ sbWal.act }}" style="height:28px;border:1px solid {{ sbWal.btnBorder }};background:{{ sbWal.btnBg }};color:{{ sbWal.btnFg }};border-radius:3px;font:500 10px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer">{{ sbWal.btn }}</button>
+            </sc-if>
+          </div>
+        </sc-if>
+        <sc-if value="{{ sb.narrow }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:8px;display:flex;flex-direction:column;gap:6px">
+            <sc-if value="{{ sbMine.mining }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ mineStop }}" title="Stop mining" style="height:40px;border:1px solid #d6d5cf;background:#ffffff;border-radius:3px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font:500 9.5px 'Geist Mono',monospace;letter-spacing:0.06em;text-transform:uppercase;color:#0e0f12"><span style="width:6px;height:6px;background:#2a5cf5;display:block"></span>Stop</button>
+            </sc-if>
+            <sc-if value="{{ sbWal.has }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ sbWal.act }}" title="{{ sbWal.title }}" style="height:44px;border:1px solid {{ sbWal.btnBorder }};background:{{ sbWal.btnBg }};color:{{ sbWal.btnFg }};border-radius:3px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font:500 9.5px 'Geist Mono',monospace;letter-spacing:0.06em;text-transform:uppercase"><span style="width:6px;height:6px;border:1.5px solid currentColor;background:{{ sbWal.fill }};display:block"></span>{{ sbWal.btn }}</button>
+            </sc-if>
+          </div>
+        </sc-if>
+      </div>
+    </aside>
+
+    <main style="flex:1;min-width:0;display:flex;flex-direction:column">
+      <header style="height:46px;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 20px;border-bottom:1px solid #e6e5e0;background:#fbfbf9">
+        <h1 style="margin:0;display:flex;align-items:center;gap:9px;font:400 11px 'Geist Mono',monospace;letter-spacing:0.12em;text-transform:uppercase;color:{{ head.color }}"><span style="width:7px;height:7px;background:{{ head.color }};display:block"></span>{{ head.num }} · {{ head.label }}</h1>
+        <div style="font:400 11px 'Geist Mono',monospace;color:#62646b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ head.sub }}</div>
+      </header>
+
+      <sc-if value="{{ banner.show }}" hint-placeholder-val="{{ false }}">
+        <div role="status" style="flex:none;padding:9px 20px;border-bottom:1px solid {{ banner.border }};background:{{ banner.bg }};color:{{ banner.fg }};display:grid;gap:6px">
+          <div style="display:flex;align-items:baseline;gap:6px 12px;flex-wrap:wrap;font-size:12.5px;line-height:1.45">
+            <span style="font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase">{{ banner.label }}</span>
+            <span style="flex:1;min-width:200px">{{ banner.text }}</span>
+            <sc-if value="{{ banner.hasDetail }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ toggleDetail }}" aria-expanded="{{ showDetail }}" style="height:22px;padding:0 8px;border:1px solid {{ banner.border }};background:transparent;color:{{ banner.fg }};border-radius:3px;font:500 9.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer">{{ banner.detailLabel }}</button>
+            </sc-if>
+          </div>
+          <sc-if value="{{ banner.detailOpen }}" hint-placeholder-val="{{ false }}">
+            <pre style="margin:0;padding:8px 10px;background:#ffffff;border:1px solid {{ banner.border }};border-radius:3px;font:400 11px/1.5 'Geist Mono',monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-height:120px;overflow:auto;user-select:text">{{ banner.detail }}</pre>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <div data-view-scroll="true" style="flex:1;min-height:0;overflow:auto">
+
+<!-- OVERVIEW -->
+<sc-if value="{{ v.overview }}" hint-placeholder-val="{{ true }}">
+<div data-screen-label="01 Overview" style="padding:18px 20px 24px;display:grid;gap:16px;max-width:1180px">
+
+  <section aria-label="Laser Core" style="position:relative;height:112px;background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;overflow:hidden">
+    <canvas ref="{{ beamRef }}" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+    <div style="position:relative;height:100%;padding:16px 20px;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none">
+      <div style="font:500 28px/1 'Geist',sans-serif;letter-spacing:-0.045em">Laser C<span style="font-family:'Michroma',sans-serif;font-weight:400;font-size:0.8em;letter-spacing:-0.02em;color:#00897d">or</span>e</div>
+      <div style="display:flex;align-items:center;gap:8px;font:400 10.5px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b"><span style="width:6px;height:6px;background:{{ beam.dot }};display:block"></span>{{ beam.label }}</div>
+    </div>
+  </section>
+
+  <section aria-label="Wallet" style="background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;min-width:0">
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #e6e5e0;background:#fbfbf9">
+      <label for="ov-wallet" style="font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b;margin-right:2px">Wallet</label>
+      <select id="ov-wallet" value="{{ selected }}" onChange="{{ onSelect }}" disabled="{{ noWallets }}" style="height:30px;min-width:170px;max-width:240px;padding:0 8px;border:1px solid #d6d5cf;background:#ffffff;border-radius:3px;font:400 12.5px 'Geist Mono',monospace;color:#0e0f12;cursor:pointer">
+        <sc-if value="{{ noWallets }}" hint-placeholder-val="{{ false }}"><option value="">No wallets yet</option></sc-if>
+        <sc-for list="{{ walletOpts }}" as="w" hint-placeholder-count="2"><option value="{{ w.name }}">{{ w.label }}</option></sc-for>
+      </select>
+      <button onClick="{{ openSelected }}" disabled="{{ wb.openDisabled }}" style="height:30px;padding:0 12px;border:1px solid #0e0f12;background:#0e0f12;color:#ffffff;border-radius:3px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer" style-hover="background:#2b2d33">{{ wb.openLabel }}</button>
+      <button onClick="{{ openCreate }}" style="height:30px;padding:0 12px;border:1px solid #d6d5cf;background:#ffffff;color:#0e0f12;border-radius:3px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer" style-hover="background:#f4f4f1">Create</button>
+      <button onClick="{{ openRestore }}" style="height:30px;padding:0 12px;border:1px solid #d6d5cf;background:#ffffff;color:#0e0f12;border-radius:3px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer" style-hover="background:#f4f4f1">Restore</button>
+      <button onClick="{{ lockSelected }}" disabled="{{ wb.lockDisabled }}" style="margin-left:auto;height:30px;padding:0 12px;border:1px solid #d6d5cf;background:#ffffff;color:#0e0f12;border-radius:3px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;gap:7px" style-hover="background:#f4f4f1"><span style="width:6px;height:6px;border:1.5px solid currentColor;display:block"></span>Lock</button>
+    </div>
+
+    <sc-if value="{{ bal.none }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:22px 20px;display:grid;gap:18px;grid-template-columns:{{ cols.first }}">
+        <div style="display:grid;gap:10px;align-content:start">
+          <div style="display:flex;align-items:center;gap:8px;font:400 10.5px 'Geist Mono',monospace;letter-spacing:0.12em;text-transform:uppercase;color:#6a2cf0"><span style="width:6px;height:6px;background:#6a2cf0;display:block"></span>First step</div>
+          <h2 style="margin:0;font:500 22px/1.2 'Geist',sans-serif;letter-spacing:-0.025em;text-wrap:balance">Create a wallet to hold Shadownet LASER</h2>
+          <p style="margin:0;font-size:13px;line-height:1.55;color:#62646b;text-wrap:pretty">A wallet is an encrypted .key file on this computer, protected by a passphrase you choose. The passphrase cannot be reset or recovered.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+            <button onClick="{{ openCreate }}" style="height:34px;padding:0 14px;border:1px solid #0e0f12;background:#0e0f12;color:#ffffff;border-radius:3px;font:500 11px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer" style-hover="background:#2b2d33">Create wallet</button>
+            <button onClick="{{ openRestore }}" style="height:34px;padding:0 14px;border:1px solid #d6d5cf;background:#ffffff;color:#0e0f12;border-radius:3px;font:500 11px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer" style-hover="background:#f4f4f1">Restore a backup</button>
+          </div>
+        </div>
+        <div style="padding:14px 16px;background:#f8f8f6;border:1px solid #e6e5e0;border-radius:3px;display:grid;gap:8px;align-content:start">
+          <div style="font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b">Backups</div>
+          <div style="font-size:12.5px;line-height:1.55">Back up the wallet's .key file while Laser Core is closed. It is normally stored at</div>
+          <code style="display:block;padding:6px 8px;background:#ffffff;border:1px solid #e6e5e0;border-radius:2px;font:400 11px 'Geist Mono',monospace;overflow-wrap:anywhere;user-select:all">{{ walletBackupPath }}</code>
+          <div style="font-size:12.5px;line-height:1.55;color:#62646b">Keep the backup and its passphrase private. Restore imports a backup under a new name.</div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ bal.locked }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:22px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <div style="flex:1;min-width:220px;display:grid;gap:5px">
+          <div style="display:flex;align-items:center;gap:7px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#8a4b00"><span style="width:7px;height:7px;border:1.5px solid #8a4b00;display:block"></span>Locked</div>
+          <div style="font:500 17px 'Geist',sans-serif;letter-spacing:-0.015em">{{ selected }} is locked</div>
+          <div style="font-size:13px;line-height:1.5;color:#62646b">Its balance is unknown until you unlock it. Unlocking does not start mining.</div>
+        </div>
+        <button onClick="{{ openSelected }}" style="height:34px;padding:0 14px;border:1px solid #0e0f12;background:#0e0f12;color:#ffffff;border-radius:3px;font:500 11px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer" style-hover="background:#2b2d33">Unlock {{ selected }}</button>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ bal.loading }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:28px 20px;font:400 12px 'Geist Mono',monospace;color:#62646b">Opening {{ selected }}…</div>
+    </sc-if>
+
+    <sc-if value="{{ bal.open }}" hint-placeholder-val="{{ true }}">
+      <div style="display:grid;grid-template-columns:{{ cols.bal }}">
+        <div style="padding:16px 18px 18px;border-right:{{ cols.balBorder }};border-bottom:1px solid #efeee9;min-width:0">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b"><span>Available</span><sc-if value="{{ bal.stale }}" hint-placeholder-val="{{ false }}"><span style="padding:1px 6px;border:1px dashed #a9aab0;border-radius:2px;color:#62646b">Stale</span></sc-if></div>
+          <div title="{{ bal.avail.full }}" style="margin-top:10px;font:500 30px/1.05 'Geist Mono',monospace;letter-spacing:-0.04em;color:{{ bal.color }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ bal.avail.i }}{{ bal.avail.f }}<span style="color:#c4c4be">{{ bal.avail.z }}</span><span style="font:400 12px 'Geist Mono',monospace;letter-spacing:0;color:#62646b;margin-left:8px">LASER</span></div>
+          <div style="margin-top:8px;font:400 11px 'Geist Mono',monospace;color:#62646b">{{ bal.availSub }}</div>
+        </div>
+        <div style="display:grid;min-width:0">
+          <div style="padding:12px 18px;border-bottom:1px solid #efeee9;min-width:0">
+            <div style="font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b">Pending · mempool</div>
+            <sc-if value="{{ bal.pendKnown }}" hint-placeholder-val="{{ true }}">
+              <div title="{{ bal.pend.full }}" style="margin-top:5px;font:500 16px 'Geist Mono',monospace;letter-spacing:-0.02em;color:{{ bal.pendColor }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ bal.pend.s }}{{ bal.pend.i }}{{ bal.pend.f }}<span style="color:#c4c4be">{{ bal.pend.z }}</span></div>
+            </sc-if>
+            <sc-if value="{{ bal.pendUnknown }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:6px;display:inline-block;padding:2px 7px;border:1px dashed #a9aab0;border-radius:2px;font:400 11px 'Geist Mono',monospace;color:#62646b">Not reported</div>
+            </sc-if>
+            <div style="margin-top:3px;font:400 10.5px 'Geist Mono',monospace;color:#8a8b90">{{ bal.pendSub }}</div>
+          </div>
+          <div style="padding:12px 18px;border-bottom:1px solid #efeee9;min-width:0">
+            <div style="font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b">Projected total</div>
+            <sc-if value="{{ bal.pendKnown }}" hint-placeholder-val="{{ true }}">
+              <div title="{{ bal.proj.full }}" style="margin-top:5px;font:500 16px 'Geist Mono',monospace;letter-spacing:-0.02em;color:{{ bal.color }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ bal.proj.i }}{{ bal.proj.f }}<span style="color:#c4c4be">{{ bal.proj.z }}</span></div>
+            </sc-if>
+            <sc-if value="{{ bal.pendUnknown }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:6px;display:inline-block;padding:2px 7px;border:1px dashed #a9aab0;border-radius:2px;font:400 11px 'Geist Mono',monospace;color:#62646b">Not reported</div>
+            </sc-if>
+            <div style="margin-top:3px;font:400 10.5px 'Geist Mono',monospace;color:#8a8b90">Available plus pending, once included in a block</div>
+          </div>
+        </div>
+      </div>
+      <div style="padding:9px 18px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;font:400 11px 'Geist Mono',monospace;color:#62646b">
+        <span style="display:flex;align-items:center;gap:8px;min-width:0">Address <span title="{{ bal.addrFull }}" style="color:#0e0f12;user-select:all">{{ bal.addr }}</span>
+          <button onClick="{{ copyAddr }}" style="height:22px;padding:0 8px;border:1px solid #d6d5cf;background:#ffffff;color:#0e0f12;border-radius:2px;font:500 9.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer" style-hover="background:#f4f4f1">{{ copyLabel }}</button>
+        </span>
+        <span>Nonce <span style="color:#0e0f12">{{ bal.nonce }}</span></span>
+        <span style="margin-left:auto">{{ bal.updated }}</span>
+      </div>
+    </sc-if>
+  </section>
+
+  <div style="display:grid;grid-template-columns:{{ cols.two }};gap:16px">
+    <section aria-label="Local node" style="background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;min-width:0">
+      <div style="height:40px;padding:0 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #e6e5e0;font:400 10.5px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase">
+        <h2 style="margin:0;font:inherit;display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;background:#0a84c8;display:block"></span>Local node</h2>
+        <button onClick="{{ goNetwork }}" style="border:none;background:none;padding:0;font:inherit;color:#62646b;cursor:pointer" style-hover="color:#0e0f12">Network →</button>
+      </div>
+      <sc-for list="{{ ovNode }}" as="r" hint-placeholder-count="5">
+        <div style="display:flex;justify-content:space-between;gap:12px;padding:8px 14px;border-bottom:1px solid #f1f0ec;font-size:12.5px">
+          <span style="color:#62646b;white-space:nowrap">{{ r.k }}</span>
+          <span title="{{ r.title }}" style="font-family:'Geist Mono',monospace;font-size:12px;color:{{ r.vc }};text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.v }}</span>
+        </div>
+      </sc-for>
+    </section>
+    <section aria-label="Miner" style="background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;min-width:0;display:flex;flex-direction:column">
+      <div style="height:40px;padding:0 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #e6e5e0;font:400 10.5px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase">
+        <h2 style="margin:0;font:inherit;display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;background:#2a5cf5;display:block"></span>Miner</h2>
+        <button onClick="{{ goMining }}" style="border:none;background:none;padding:0;font:inherit;color:#62646b;cursor:pointer" style-hover="color:#0e0f12">Mining →</button>
+      </div>
+      <sc-for list="{{ ovMine }}" as="r" hint-placeholder-count="4">
+        <div style="display:flex;justify-content:space-between;gap:12px;padding:8px 14px;border-bottom:1px solid #f1f0ec;font-size:12.5px">
+          <span style="color:#62646b;white-space:nowrap">{{ r.k }}</span>
+          <span title="{{ r.title }}" style="font-family:'Geist Mono',monospace;font-size:12px;color:{{ r.vc }};text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.v }}</span>
+        </div>
+      </sc-for>
+      <div style="padding:10px 14px;margin-top:auto">
+        <sc-if value="{{ sbMine.mining }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ mineStop }}" style="height:30px;padding:0 12px;border:1px solid #d6d5cf;background:#ffffff;color:#0e0f12;border-radius:3px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer" style-hover="background:#f4f4f1">Stop mining</button>
+        </sc-if>
+        <sc-if value="{{ sbMine.idle }}" hint-placeholder-val="{{ true }}">
+          <button onClick="{{ goMining }}" style="height:30px;padding:0 12px;border:1px solid #d6d5cf;background:#ffffff;color:#0e0f12;border-radius:3px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer" style-hover="background:#f4f4f1">Set up mining</button>
+        </sc-if>
+      </div>
+    </section>
+  </div>
+
+  <section aria-label="Session activity" style="background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;min-width:0">
+    <div style="min-height:40px;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 10px;border-bottom:1px solid #e6e5e0;font:400 10.5px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase">
+      <h2 style="margin:0;font:inherit;display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;background:#6a2cf0;display:block"></span>Session activity</h2>
+      <span style="color:#62646b;letter-spacing:0.04em;text-transform:none">Kept in memory · clears when Laser Core closes · not a transaction history</span>
+    </div>
+    <sc-if value="{{ actEmpty }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:20px 14px;font-size:13px;color:#62646b">Nothing yet this session. Wallet, mining, send and chain events appear here as they happen.</div>
+    </sc-if>
+    <sc-for list="{{ activity }}" as="a" hint-placeholder-count="4">
+      <div style="display:grid;grid-template-columns:62px 10px minmax(0,1fr) auto;align-items:baseline;gap:10px;padding:8px 14px;border-bottom:1px solid #f1f0ec;font-size:12.5px">
+        <span style="font:400 11px 'Geist Mono',monospace;color:#8a8b90">{{ a.time }}</span>
+        <span style="width:6px;height:6px;background:{{ a.dot }};display:block;align-self:center"></span>
+        <span style="min-width:0;color:{{ a.fg }}">{{ a.text }}</span>
+        <span title="{{ a.detail }}" style="font:400 11px 'Geist Mono',monospace;color:#62646b;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ a.detail }}</span>
+      </div>
+    </sc-for>
+  </section>
+</div>
+</sc-if>
+
+<!-- SEND -->
+<sc-if value="{{ v.send }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="02 Send" style="padding:18px 20px 24px;display:grid;gap:16px;max-width:1180px">
+  <section aria-label="Send" style="position:relative;height:112px;background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;overflow:hidden">
+    <canvas ref="{{ beamRef }}" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+    <div style="position:relative;height:100%;padding:16px 20px;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none">
+      <div style="font:500 28px/1 'Geist',sans-serif;letter-spacing:-0.045em">Se<span style="font-family:'Michroma',sans-serif;font-weight:400;font-size:0.8em;letter-spacing:-0.02em;color:#c4237f">nd</span></div>
+      <div style="display:flex;align-items:center;gap:8px;font:400 10.5px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b"><span style="width:6px;height:6px;background:#c4237f;display:block"></span>{{ beam.sendLabel }}</div>
+    </div>
+  </section>
+  <div style="display:grid;grid-template-columns:{{ cols.send }};gap:16px;align-items:start">
+    <section aria-label="Payment" style="background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;min-width:0">
+      <div style="padding:16px 18px;display:grid;gap:16px">
+        <div style="display:grid;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><label for="send-to" style="font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b">Pay to</label><span style="font:400 10.5px 'Geist Mono',monospace;color:{{ sf.countColor }}">{{ sf.count }}</span></div>
+          <input id="send-to" list="contact-list" value="{{ send.to }}" onChange="{{ on.to }}" onBlur="{{ on.toBlur }}" placeholder="64-character hexadecimal address" spellCheck="false" autoComplete="off" maxLength="66" aria-invalid="{{ sf.toInvalid }}" aria-describedby="send-to-msg" style="height:36px;padding:0 10px;border:1px solid {{ sf.toBorder }};background:#ffffff;border-radius:3px;font:400 12.5px 'Geist Mono',monospace;color:#0e0f12;width:100%;min-width:0">
+          <datalist id="contact-list"><sc-for list="{{ contacts }}" as="c" hint-placeholder-count="0"><option value="{{ c.address }}">{{ c.label }}</option></sc-for></datalist>
+          <div id="send-to-msg" style="min-height:16px;font-size:12px;color:{{ sf.toMsgColor }}">{{ sf.toMsg }}</div>
+        </div>
+        <div style="display:grid;gap:6px">
+          <label for="send-label" style="font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b">Label · optional</label>
+          <div style="display:flex;gap:8px">
+            <input id="send-label" value="{{ send.label }}" onChange="{{ on.label }}" placeholder="Name for the address book" maxLength="64" style="flex:1;height:32px;padding:0 10px;border:1px solid #d6d5cf;background:#ffffff;border-radius:3px;font:400 13px 'Geist',sans-serif;color:#0e0f12;min-width:0">
+            <button onClick="{{ saveContact }}" disabled="{{ sf.saveDisabled }}" style="height:32px;padding:0 12px;border:1px solid #d6d5cf;background:#ffffff;color:#0e0f12;border-radius:3px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;white-space:nowrap" style-hover="background:#f4f4f1">Save contact</button>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:{{ cols.amt }};gap:16px">
+          <div style="display:grid;gap:6px;min-width:0">
+            <label for="send-amount" style="font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b">Amount</label>
+            <div style="display:flex;align-items:center;height:36px;border:1px solid {{ sf.amtBorder }};background:#ffffff;border-radius:3px;padding-right:10px">
+              <input id="send-amount" value="{{ send.amount }}" onChange="{{ on.amount }}" onBlur="{{ on.amountBlur }}" inputMode="decimal" placeholder="0.000000000" autoComplete="off" aria-invalid="{{ sf.amtInvalid }}" aria-describedby="send-amt-msg" style="flex:1;min-width:0;height:34px;border:none;outline:none;background:transparent;padding:0 10px;font:500 15px 'Geist Mono',monospace;color:#0e0f12">
+              <span style="font:400 11px 'Geist Mono',monospace;color:#62646b">LASER</span>
+            </div>
+            <div id="send-amt-msg" style="min-height:16px;font-size:12px;color:{{ sf.amtMsgColor }}">{{ sf.amtMsg }}</div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer"><input type="checkbox" checked="{{ send.subtract }}" onChange="{{ on.subtract }}" style="width:14px;height:14px;margin:0;accent-color:#0e0f12">Subtract fee from amount</label>
+          </div>
+          <div style="display:grid;gap:6px;min-width:0;align-content:start">
+            <label for="send-from" style="font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b">From wallet</label>
+            <select id="send-from" value="{{ sf.from }}" onChange="{{ on.from }}" disabled="{{ noWallets }}" style="height:36px;padding:0 8px;border:1px solid #d6d5cf;background:#ffffff;border-radius:3px;font:400 12.5px 'Geist Mono',monospace;color:#0e0f12;min-width:0;cursor:pointer">
+              <sc-if value="{{ noWallets }}" hint-placeholder-val="{{ false }}"><option value="">No wallets</option></sc-if>
+              <sc-for list="{{ walletOpts }}" as="w" hint-placeholder-count="2"><option value="{{ w.name }}">{{ w.label }}</option></sc-for>
+            </select>
+            <div style="min-height:16px;font-size:12px;color:{{ sf.fromColor }};display:flex;align-items:center;gap:8px;flex-wrap:wrap">{{ sf.fromMsg }}
+              <sc-if value="{{ sf.fromNeedsUnlock }}" hint-placeholder-val="{{ false }}"><button onClick="{{ unlockFrom }}" style="height:22px;padding:0 8px;border:1px solid #0e0f12;background:#0e0f12;color:#ffffff;border-radius:2px;font:500 9.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer">Unlock</button></sc-if>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="border-top:1px solid #e6e5e0;padding:14px 18px 16px;display:grid;gap:10px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
+          <span id="fee-label" style="font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b">Transaction fee · flat, per transaction</span>
+          <span style="font:400 10.5px 'Geist Mono',monospace;color:#62646b">Custom fees supported</span>
+        </div>
+        <div role="radiogroup" aria-labelledby="fee-label" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:6px">
+          <sc-for list="{{ fees }}" as="f" hint-placeholder-count="6">
+            <button role="radio" aria-checked="{{ f.on }}" onClick="{{ f.pick }}" style="padding:8px 10px;border:1px solid {{ f.border }};background:{{ f.bg }};border-radius:3px;cursor:pointer;text-align:left;display:grid;gap:3px;color:#0e0f12" style-hover="border-color:#0e0f12">
+              <span style="font:500 12px 'Geist',sans-serif">{{ f.label }}</span>
+              <span style="font:400 11px 'Geist Mono',monospace;color:#62646b">{{ f.v }}</span>
+            </button>
+          </sc-for>
+        </div>
+        <sc-if value="{{ sf.custom }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <label for="send-fee" style="font-size:12.5px;color:#62646b">Custom fee</label>
+            <div style="display:flex;align-items:center;height:32px;width:200px;border:1px solid {{ sf.feeBorder }};background:#ffffff;border-radius:3px;padding-right:10px">
+              <input id="send-fee" autoFocus="{{ true }}" value="{{ send.feeCustom }}" onChange="{{ on.feeCustom }}" inputMode="decimal" placeholder="0.010000000" style="flex:1;min-width:0;height:30px;border:none;outline:none;background:transparent;padding:0 10px;font:400 12.5px 'Geist Mono',monospace;color:#0e0f12">
+              <span style="font:400 11px 'Geist Mono',monospace;color:#62646b">LASER</span>
+            </div>
+            <span style="font-size:12px;color:#a1203d">{{ sf.feeMsg }}</span>
+          </div>
+        </sc-if>
+        <div style="font-size:12px;line-height:1.5;color:#62646b">The fee is paid to the miner that includes the transaction in a block. Laser Core does not estimate inclusion time.</div>
+      </div>
+    </section>
+
+    <section aria-label="Summary" style="background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;min-width:0">
+      <div style="height:40px;padding:0 14px;display:flex;align-items:center;border-bottom:1px solid #e6e5e0;font:400 10.5px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;gap:8px"><span style="width:6px;height:6px;background:#c4237f;display:block"></span>Summary</div>
+      <sc-for list="{{ sumRows }}" as="r" hint-placeholder-count="5">
+        <div style="display:flex;justify-content:space-between;gap:10px;padding:9px 14px;border-bottom:1px solid #f1f0ec;font-size:12.5px">
+          <span style="color:#62646b">{{ r.k }}</span>
+          <span title="{{ r.title }}" style="font:{{ r.w }} 12.5px 'Geist Mono',monospace;color:{{ r.vc }};text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.v }}</span>
+        </div>
+      </sc-for>
+      <div style="padding:12px 14px 14px;display:grid;gap:8px">
+        <button onClick="{{ review }}" disabled="{{ sf.reviewDisabled }}" style="height:38px;border:1px solid #0e0f12;background:#0e0f12;color:#ffffff;border-radius:3px;font:500 11px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer" style-hover="background:#2b2d33">Review transaction</button>
+        <div style="min-height:16px;font-size:12px;line-height:1.45;color:{{ sf.blockColor }}">{{ sf.blocker }}</div>
+        <button onClick="{{ clearSend }}" style="height:28px;border:1px solid #d6d5cf;background:#ffffff;color:#62646b;border-radius:3px;font:500 10px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer" style-hover="background:#f4f4f1;color:#0e0f12">Clear form</button>
+      </div>
+    </section>
+  </div>
+
+  <section aria-label="Address book" style="background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;min-width:0">
+    <div style="min-height:40px;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 10px;border-bottom:1px solid #e6e5e0;font:400 10.5px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase">
+      <h2 style="margin:0;font:inherit;display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;background:#0e0f12;display:block"></span>Address book</h2>
+      <span style="color:#62646b;letter-spacing:0.04em;text-transform:none">Stored on this computer only</span>
+    </div>
+    <sc-if value="{{ contactsEmpty }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:16px 14px;font-size:13px;color:#62646b">No saved contacts. Enter an address and a label above, then choose Save contact.</div>
+    </sc-if>
+    <sc-for list="{{ contacts }}" as="c" hint-placeholder-count="2">
+      <div style="display:grid;grid-template-columns:minmax(80px,180px) minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px 14px;border-bottom:1px solid #f1f0ec">
+        <span style="font:500 12.5px 'Geist',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.label }}</span>
+        <span title="{{ c.address }}" style="font:400 11.5px 'Geist Mono',monospace;color:#62646b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;user-select:all">{{ c.address }}</span>
+        <span style="display:flex;gap:6px">
+          <button onClick="{{ c.use }}" style="height:24px;padding:0 9px;border:1px solid #d6d5cf;background:#ffffff;color:#0e0f12;border-radius:2px;font:500 9.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer" style-hover="background:#f4f4f1">Use</button>
+          <button onClick="{{ c.remove }}" aria-label="{{ c.removeLabel }}" style="height:24px;padding:0 9px;border:1px solid transparent;background:transparent;color:#62646b;border-radius:2px;font:500 9.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer" style-hover="color:#a1203d;border-color:#efc6cf">Remove</button>
+        </span>
+      </div>
+    </sc-for>
+  </section>
+</div>
+</sc-if>
+
+<!-- RECEIVE -->
+<sc-if value="{{ v.receive }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="03 Receive" style="padding:18px 20px 24px;display:grid;gap:16px;max-width:900px">
+  <section aria-label="Receive" style="position:relative;height:112px;background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;overflow:hidden">
+    <canvas ref="{{ beamRef }}" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+    <div style="position:relative;height:100%;padding:16px 20px;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none">
+      <div style="font:500 28px/1 'Geist',sans-serif;letter-spacing:-0.045em">Rec<span style="font-family:'Michroma',sans-serif;font-weight:400;font-size:0.8em;letter-spacing:-0.02em;color:#00897d">ei</span>ve</div>
+      <div style="display:flex;align-items:center;gap:8px;font:400 10.5px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b"><span style="width:6px;height:6px;background:#00897d;display:block"></span>{{ beam.recvLabel }}</div>
+    </div>
+  </section>
+  <section aria-label="Receive address" style="background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;min-width:0">
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #e6e5e0;background:#fbfbf9">
+      <label for="rc-wallet" style="font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b">Wallet</label>
+      <select id="rc-wallet" value="{{ selected }}" onChange="{{ onSelect }}" disabled="{{ noWallets }}" style="height:30px;min-width:170px;padding:0 8px;border:1px solid #d6d5cf;background:#ffffff;border-radius:3px;font:400 12.5px 'Geist Mono',monospace;color:#0e0f12;cursor:pointer">
+        <sc-if value="{{ noWallets }}" hint-placeholder-val="{{ false }}"><option value="">No wallets yet</option></sc-if>
+        <sc-for list="{{ walletOpts }}" as="w" hint-placeholder-count="2"><option value="{{ w.name }}">{{ w.label }}</option></sc-for>
+      </select>
+    </div>
+    <sc-if value="{{ rc.none }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:24px 20px;display:grid;gap:10px;justify-items:start">
+        <div style="font:500 17px 'Geist',sans-serif;letter-spacing:-0.015em">No wallet to receive with</div>
+        <div style="font-size:13px;line-height:1.5;color:#62646b">Create a wallet or restore a backup. Its address appears here once it is open.</div>
+        <div style="display:flex;gap:8px"><button onClick="{{ openCreate }}" style="height:32px;padding:0 13px;border:1px solid #0e0f12;background:#0e0f12;color:#ffffff;border-radius:3px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer">Create wallet</button><button onClick="{{ openRestore }}" style="height:32px;padding:0 13px;border:1px solid #d6d5cf;background:#ffffff;color:#0e0f12;border-radius:3px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer">Restore</button></div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ rc.locked }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:24px 20px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+        <div style="flex:1;min-width:220px;display:grid;gap:5px">
+          <div style="font:500 17px 'Geist',sans-serif;letter-spacing:-0.015em">Unlock {{ selected }} to show its address</div>
+          <div style="font-size:13px;line-height:1.5;color:#62646b">The address is read from the wallet file when it is opened.</div>
+        </div>
+        <button onClick="{{ openSelected }}" style="height:34px;padding:0 14px;border:1px solid #0e0f12;background:#0e0f12;color:#ffffff;border-radius:3px;font:500 11px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer">Unlock</button>
+      </div>
+    </sc-if>
+    <sc-if value="{{ rc.open }}" hint-placeholder-val="{{ true }}">
+      <div style="padding:20px 20px 18px;display:grid;gap:14px">
+        <div style="display:flex;align-items:center;gap:8px;font:400 10.5px 'Geist Mono',monospace;letter-spacing:0.12em;text-transform:uppercase;color:#00897d"><span style="width:6px;height:6px;background:#00897d;display:block"></span>{{ selected }} · receiving address</div>
+        <div id="rc-address" aria-label="{{ rc.aria }}" style="padding:16px 18px;border:1px solid #e6e5e0;background:#f8f8f6;border-radius:3px;font:500 clamp(14px,2.1vw,19px)/1.6 'Geist Mono',monospace;letter-spacing:0.02em;user-select:all;overflow-wrap:anywhere"><sc-for list="{{ rc.groups }}" as="g" hint-placeholder-count="8"><span style="margin-right:0.6em;color:{{ g.c }}">{{ g.t }}</span></sc-for></div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button onClick="{{ copyAddr }}" style="height:36px;padding:0 16px;border:1px solid #0e0f12;background:#0e0f12;color:#ffffff;border-radius:3px;font:500 11px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer" style-hover="background:#2b2d33">{{ copyLabel }}</button>
+          <span role="status" aria-live="polite" style="font-size:12.5px;color:{{ rc.copyColor }}">{{ rc.copyMsg }}</span>
+        </div>
+      </div>
+      <div style="border-top:1px solid #e6e5e0;padding:12px 20px;display:grid;gap:4px;font-size:12.5px;line-height:1.55;color:#62646b">
+        <div>Share all 64 characters. Laser addresses are hexadecimal and have no 0x prefix.</div>
+        <div>This address receives Shadownet test LASER only. Shadownet coins have no value.</div>
+      </div>
+    </sc-if>
+  </section>
+</div>
+</sc-if>
+
+<!-- MINING -->
+<sc-if value="{{ v.mining }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="04 Mining" style="padding:18px 20px 24px;display:grid;gap:16px;max-width:1180px">
+  <section aria-label="Mining" style="position:relative;height:216px;background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;overflow:hidden">
+    <canvas ref="{{ beamRef }}" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+    <div style="position:relative;height:100%;padding:20px 22px;display:flex;flex-direction:column;gap:10px;pointer-events:none">
+      <div style="font:500 44px/1 'Geist',sans-serif;letter-spacing:-0.05em">Mi<span style="font-family:'Michroma',sans-serif;font-weight:400;font-size:0.8em;letter-spacing:-0.02em;color:#2a5cf5">ni</span>ng</div>
+      <div style="display:flex;align-items:center;gap:8px;font:400 10.5px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:{{ beam.mineFg }}"><span style="width:6px;height:6px;background:{{ beam.mineDot }};display:block"></span>{{ beam.mineLabel }}</div>
+      <div style="margin-top:-4px;font:400 10.5px 'Geist Mono',monospace;color:#8a8b90">{{ beam.mineFoot }}</div>
+    </div>
+  </section>
+  <section aria-label="Mining control" style="background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;min-width:0">
+    <div style="padding:14px 18px;display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;border-bottom:1px solid #efeee9">
+      <div style="display:grid;gap:6px;flex:1 1 180px;min-width:0;max-width:280px">
+        <label for="mine-wallet" style="font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b">Mining wallet</label>
+        <select id="mine-wallet" value="{{ mc.wallet }}" onChange="{{ onMineWallet }}" disabled="{{ mc.locked }}" style="height:36px;padding:0 8px;border:1px solid #d6d5cf;background:#ffffff;border-radius:3px;font:400 12.5px 'Geist Mono',monospace;color:#0e0f12;cursor:pointer">
+          <sc-if value="{{ noWallets }}" hint-placeholder-val="{{ false }}"><option value="">No wallets</option></sc-if>
+          <sc-for list="{{ walletOpts }}" as="w" hint-placeholder-count="2"><option value="{{ w.name }}">{{ w.label }}</option></sc-for>
+        </select>
+      </div>
+      <div style="display:grid;gap:6px;width:150px">
+        <label for="mine-interval" style="font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b">Cycle interval</label>
+        <div style="display:flex;align-items:center;height:36px;border:1px solid {{ mc.ivBorder }};background:#ffffff;border-radius:3px;padding-right:10px">
+          <input id="mine-interval" type="number" min="1" max="120" step="1" value="{{ intervalStr }}" onChange="{{ onInterval }}" disabled="{{ mc.locked }}" aria-describedby="mine-iv-help" style="flex:1;min-width:0;height:34px;border:none;outline:none;background:transparent;padding:0 10px;font:500 14px 'Geist Mono',monospace;color:#0e0f12">
+          <span style="font:400 11px 'Geist Mono',monospace;color:#62646b">seconds</span>
+        </div>
+      </div>
+      <button onClick="{{ mineToggle }}" disabled="{{ mc.btnDisabled }}" style="margin-left:auto;height:40px;min-width:150px;padding:0 18px;border:1px solid {{ mc.btnBorder }};background:{{ mc.btnBg }};color:{{ mc.btnFg }};border-radius:3px;font:500 11.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px"><span style="width:7px;height:7px;background:{{ mc.btnDot }};display:block"></span>{{ mc.btnLabel }}</button>
+    </div>
+    <div style="padding:14px 18px;display:grid;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:8px 14px;flex-wrap:wrap">
+        <span style="font:500 17px 'Geist',sans-serif;letter-spacing:-0.015em;color:{{ mc.titleFg }}">{{ mc.title }}</span>
+        <span style="font:400 11.5px 'Geist Mono',monospace;color:#62646b">{{ mc.sub }}</span>
+      </div>
+      <div style="display:flex;gap:6px 16px;flex-wrap:wrap">
+        <sc-for list="{{ prereq }}" as="p" hint-placeholder-count="3">
+          <span style="display:flex;align-items:center;gap:6px;font:400 11.5px 'Geist Mono',monospace;color:{{ p.fg }}"><span aria-hidden="true">{{ p.mark }}</span>{{ p.text }}</span>
+        </sc-for>
+      </div>
+      <div id="mine-iv-help" style="font-size:12px;line-height:1.5;color:#62646b">{{ mc.ivHelp }}</div>
+      <sc-if value="{{ mc.hasErr }}" hint-placeholder-val="{{ false }}">
+        <div role="alert" style="padding:8px 10px;background:#fbeef0;border:1px solid #efc6cf;border-radius:3px;font-size:12.5px;line-height:1.5;color:#a1203d;display:flex;gap:10px;align-items:baseline"><span style="font:500 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase">Error</span><span style="flex:1">{{ mineErr }}</span></div>
+      </sc-if>
+    </div>
+  </section>
+
+  <div style="display:grid;grid-template-columns:{{ cols.two }};gap:16px">
+    <section aria-label="Session" style="background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;min-width:0;overflow:hidden">
+      <div style="min-height:40px;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 10px;border-bottom:1px solid #e6e5e0;font:400 10.5px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase">
+        <h2 style="margin:0;font:inherit;display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;background:#2a5cf5;display:block"></span>This session</h2>
+        <span style="color:#62646b;letter-spacing:0.04em;text-transform:none">{{ mc.sessSub }}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">
+        <sc-for list="{{ sessCells }}" as="c" hint-placeholder-count="6">
+          <div title="{{ c.title }}" style="padding:12px 14px;border-right:1px solid #f1f0ec;border-bottom:1px solid #f1f0ec;margin:0 -1px -1px 0;min-width:0">
+            <div style="font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b">{{ c.label }}</div>
+            <div style="margin-top:5px;font:500 15px/1.3 'Geist Mono',monospace;letter-spacing:-0.02em;color:{{ c.vc }};overflow-wrap:anywhere">{{ c.value }}<span style="font-size:11px;font-weight:400;letter-spacing:0;color:#62646b;margin-left:4px">{{ c.unit }}</span></div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+    <section aria-label="Wallet lifetime" style="background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;min-width:0;overflow:hidden">
+      <div style="min-height:40px;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 10px;border-bottom:1px solid #e6e5e0;font:400 10.5px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase">
+        <h2 style="margin:0;font:inherit;display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;background:#0e0f12;display:block"></span>Lifetime · active chain</h2>
+        <span style="color:#62646b;letter-spacing:0.04em;text-transform:none">{{ mc.lifeSub }}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">
+        <sc-for list="{{ lifeCells }}" as="c" hint-placeholder-count="6">
+          <div title="{{ c.title }}" style="padding:12px 14px;border-right:1px solid #f1f0ec;border-bottom:1px solid #f1f0ec;margin:0 -1px -1px 0;min-width:0">
+            <div style="font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b">{{ c.label }}</div>
+            <div style="margin-top:5px;font:500 15px/1.3 'Geist Mono',monospace;letter-spacing:-0.02em;color:{{ c.vc }};overflow-wrap:anywhere">{{ c.value }}<span style="font-size:11px;font-weight:400;letter-spacing:0;color:#62646b;margin-left:4px">{{ c.unit }}</span></div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+  </div>
+
+  <div style="display:grid;grid-template-columns:{{ cols.two }};gap:16px">
+    <section aria-label="Solve times" style="background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;min-width:0">
+      <div style="min-height:40px;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 10px;border-bottom:1px solid #e6e5e0;font:400 10.5px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase">
+        <h2 style="margin:0;font:inherit;display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;background:#6a2cf0;display:block"></span>Solve time per block</h2>
+        <span style="color:#62646b;letter-spacing:0.04em;text-transform:none">{{ solve.sub }}</span>
+      </div>
+      <div style="padding:14px">
+        <sc-if value="{{ solve.empty }}" hint-placeholder-val="{{ true }}">
+          <div style="height:76px;display:flex;align-items:center;font-size:12.5px;line-height:1.5;color:#62646b">Each block mined continuously in this session appears here with its measured solve duration.</div>
+        </sc-if>
+        <sc-if value="{{ solve.has }}" hint-placeholder-val="{{ false }}">
+          <div role="img" aria-label="{{ solve.aria }}" style="height:76px;display:flex;align-items:flex-end;gap:3px;border-bottom:1px solid #e6e5e0">
+            <sc-for list="{{ solve.bars }}" as="b" hint-placeholder-count="10"><span title="{{ b.title }}" style="width:8px;flex:none;height:{{ b.h }};background:{{ b.c }};display:block"></span></sc-for>
+          </div>
+          <div style="margin-top:6px;display:flex;justify-content:space-between;font:400 10px 'Geist Mono',monospace;color:#8a8b90"><span>{{ solve.left }}</span><span>{{ solve.right }}</span></div>
+        </sc-if>
+      </div>
+    </section>
+    <section aria-label="Mining engine" style="background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;min-width:0">
+      <div style="height:40px;padding:0 14px;display:flex;align-items:center;border-bottom:1px solid #e6e5e0;font:400 10.5px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;gap:8px"><span style="width:6px;height:6px;background:#0e0f12;display:block"></span>Mining engine</div>
+      <sc-for list="{{ engineRows }}" as="r" hint-placeholder-count="4">
+        <div style="display:flex;justify-content:space-between;gap:12px;padding:8px 14px;border-bottom:1px solid #f1f0ec;font-size:12.5px">
+          <span style="color:#62646b;white-space:nowrap">{{ r.k }}</span>
+          <span title="{{ r.title }}" style="font-family:'Geist Mono',monospace;font-size:12px;color:{{ r.vc }};text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.v }}</span>
+        </div>
+      </sc-for>
+      <div style="padding:9px 14px;font-size:11.5px;line-height:1.5;color:#62646b">CUDA, when present, accelerates the matrix stage. Every candidate is checked by the CPU implementation before it is used.</div>
+    </section>
+  </div>
+
+  <section aria-label="Mine blocks now" style="background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;min-width:0">
+    <div style="padding:14px 18px;display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center">
+      <div style="flex:1 1 260px;display:grid;gap:4px">
+        <div style="font:500 14px 'Geist',sans-serif">Mine blocks now</div>
+        <div style="font-size:12.5px;line-height:1.5;color:#62646b">{{ once.help }}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <label for="mine-once" style="font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b">Blocks</label>
+        <input id="mine-once" type="number" min="1" max="100" value="{{ onceStr }}" onChange="{{ onOnce }}" disabled="{{ once.disabled }}" style="width:72px;height:32px;padding:0 8px;border:1px solid {{ once.border }};background:#ffffff;border-radius:3px;font:500 13px 'Geist Mono',monospace;color:#0e0f12">
+        <button onClick="{{ mineOnce }}" disabled="{{ once.btnDisabled }}" style="height:32px;padding:0 13px;border:1px solid #d6d5cf;background:#ffffff;color:#0e0f12;border-radius:3px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;white-space:nowrap" style-hover="background:#f4f4f1">{{ once.label }}</button>
+      </div>
+    </div>
+    <sc-if value="{{ once.hasMsg }}" hint-placeholder-val="{{ false }}">
+      <div role="status" style="padding:8px 18px;border-top:1px solid #efeee9;font:400 11.5px 'Geist Mono',monospace;color:{{ once.msgColor }}">{{ once.msg }}</div>
+    </sc-if>
+  </section>
+
+  <div style="padding:10px 14px;border:1px dashed #d6d5cf;border-radius:3px;font-size:12px;line-height:1.55;color:#62646b">Blocks are secured by PhotonHash v0.2 proof of work. The LF2-K8 Shadow observer runs separately, does not take part in block consensus, and is reported on the Network page.</div>
+</div>
+</sc-if>
+
+<!-- NETWORK -->
+<sc-if value="{{ v.network }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="05 Network" style="padding:18px 20px 24px;display:grid;gap:16px;max-width:1180px">
+  <section aria-label="Connection summary" style="background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;min-width:0;padding:16px 18px;display:flex;align-items:center;gap:16px 24px;flex-wrap:wrap">
+    <div style="flex:1 1 300px;display:grid;gap:6px">
+      <div style="display:flex;align-items:center;gap:8px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:{{ net.fg }}"><span style="width:7px;height:7px;border-radius:50%;background:{{ net.fg }};display:block"></span>{{ net.kicker }}</div>
+      <div style="font:500 20px/1.25 'Geist',sans-serif;letter-spacing:-0.02em;text-wrap:balance">{{ net.title }}</div>
+      <div style="font-size:12.5px;line-height:1.5;color:#62646b;text-wrap:pretty">{{ net.sub }}</div>
+    </div>
+    <div style="display:flex;gap:0;border:1px solid #e6e5e0;border-radius:3px;overflow:hidden">
+      <sc-for list="{{ net.big }}" as="b" hint-placeholder-count="3">
+        <div style="padding:10px 16px;border-right:1px solid #e6e5e0;margin-right:-1px;min-width:88px">
+          <div style="font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b">{{ b.k }}</div>
+          <div style="margin-top:4px;font:500 22px 'Geist Mono',monospace;letter-spacing:-0.03em;color:{{ b.vc }}">{{ b.v }}</div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <div style="display:grid;grid-template-columns:{{ cols.two }};gap:16px">
+    <section aria-label="Peers" style="background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;min-width:0">
+      <div style="height:40px;padding:0 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e6e5e0;font:400 10.5px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase"><span style="display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;background:#0a84c8;display:block"></span>Peer connections</span><span style="color:#62646b;letter-spacing:0.04em;text-transform:none">Counts only</span></div>
+      <sc-for list="{{ peerRows }}" as="r" hint-placeholder-count="6">
+        <div style="display:flex;justify-content:space-between;gap:12px;padding:8px 14px;border-bottom:1px solid #f1f0ec;font-size:12.5px">
+          <span style="color:#62646b">{{ r.k }}</span>
+          <span style="font-family:'Geist Mono',monospace;font-size:12px;color:{{ r.vc }}">{{ r.v }}</span>
+        </div>
+      </sc-for>
+    </section>
+    <section aria-label="Local node" style="background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;min-width:0">
+      <div style="height:40px;padding:0 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e6e5e0;font:400 10.5px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase"><span style="display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;background:#0e0f12;display:block"></span>Local node</span><span style="color:#62646b;letter-spacing:0.04em;text-transform:none">{{ net.updated }}</span></div>
+      <sc-for list="{{ nodeRows }}" as="r" hint-placeholder-count="6">
+        <div style="display:flex;justify-content:space-between;gap:12px;padding:8px 14px;border-bottom:1px solid #f1f0ec;font-size:12.5px">
+          <span style="color:#62646b">{{ r.k }}</span>
+          <span title="{{ r.title }}" style="font-family:'Geist Mono',monospace;font-size:12px;color:{{ r.vc }};text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.v }}</span>
+        </div>
+      </sc-for>
+      <div style="padding:9px 14px;font-size:11.5px;line-height:1.5;color:#62646b">“RPC ready” means this node answers locally. The app has no remote target height, so it does not show a sync percentage.</div>
+    </section>
+  </div>
+
+  <section aria-label="LF2-K8 observer" style="background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;min-width:0;padding:14px 18px;display:flex;gap:12px 20px;align-items:center;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:8px;font:400 10.5px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase"><span style="width:6px;height:6px;background:#00897d;display:block"></span>LF2-K8 Shadow observer</div>
+    <span style="padding:2px 7px;border:1px solid #e6e5e0;border-radius:2px;font:500 10px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;color:#62646b">Non-consensus</span>
+    <span style="font:500 12.5px 'Geist Mono',monospace;color:{{ obs.vc }}">{{ obs.v }}</span>
+    <span style="flex:1 1 260px;font-size:12px;line-height:1.5;color:#62646b">Runs alongside the node for research measurements. It does not validate or mine blocks, and its state does not affect mining.</span>
+  </section>
+
+  <details style="background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;min-width:0">
+    <summary style="height:40px;padding:0 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;font:400 10.5px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;list-style:none"><span style="display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;border:1.5px solid #0e0f12;display:block"></span>Diagnostics</span><span style="color:#62646b;letter-spacing:0.04em;text-transform:none">{{ net.diagSum }} · show</span></summary>
+    <div style="border-top:1px solid #e6e5e0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">
+      <sc-for list="{{ diagCells }}" as="c" hint-placeholder-count="6">
+        <div style="padding:12px 14px;border-right:1px solid #f1f0ec;border-bottom:1px solid #f1f0ec;margin:0 -1px -1px 0">
+          <div style="font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b">{{ c.label }}</div>
+          <div style="margin-top:5px;font:500 16px 'Geist Mono',monospace;color:{{ c.vc }}">{{ c.value }}</div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="border-top:1px solid #e6e5e0">
+      <div style="padding:10px 14px 4px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b"><span>Configuration · read-only</span><span style="letter-spacing:0.04em;text-transform:none">Editing options is not available in this version</span></div>
+      <sc-for list="{{ cfgRows }}" as="r" hint-placeholder-count="5">
+        <div style="display:flex;justify-content:space-between;gap:12px;padding:7px 14px;border-bottom:1px solid #f1f0ec;font-size:12px">
+          <span style="color:#62646b">{{ r.k }}</span>
+          <span title="{{ r.v }}" style="font-family:'Geist Mono',monospace;font-size:11.5px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:all">{{ r.v }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </details>
+</div>
+</sc-if>
+
+      </div>
+    </main>
+  </div>
+
+  <footer aria-label="Status" style="height:28px;flex:none;border-top:1px solid #e6e5e0;background:#fbfbf9;display:flex;align-items:center;font:400 11px 'Geist Mono',monospace;color:#62646b;overflow:hidden;white-space:nowrap">
+    <sc-for list="{{ sbar }}" as="b" hint-placeholder-count="5">
+      <span title="{{ b.title }}" style="display:flex;align-items:center;gap:6px;padding:0 12px;height:100%;border-right:1px solid #efeee9;color:{{ b.fg }}"><span style="width:6px;height:6px;border-radius:{{ b.r }};background:{{ b.dot }};display:block"></span>{{ b.text }}</span>
+    </sc-for>
+    <span style="margin-left:auto;padding:0 12px;color:#8a8b90">{{ sbarRight }}</span>
+  </footer>
+
+  <sc-if value="{{ toast.show }}" hint-placeholder-val="{{ false }}">
+    <div role="status" aria-live="polite" style="position:absolute;right:16px;bottom:40px;z-index:30;max-width:380px;padding:10px 12px;background:#0e0f12;color:#fbfbf9;border-radius:4px;box-shadow:0 12px 32px rgba(14,15,18,0.2);font-size:12.5px;line-height:1.5;display:flex;gap:10px;align-items:flex-start">
+      <span style="width:6px;height:6px;margin-top:6px;background:{{ toast.dot }};display:block;flex:none"></span><span style="flex:1">{{ toast.text }}</span>
+      <button onClick="{{ closeToast }}" aria-label="Dismiss" style="border:none;background:none;color:#a9aab0;cursor:pointer;font:400 12px 'Geist Mono',monospace;padding:0">✕</button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ d.open }}" hint-placeholder-val="{{ false }}">
+    <div onMouseDown="{{ backdrop }}" style="position:absolute;inset:0;z-index:40;background:rgba(14,15,18,0.34);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto">
+      <div role="dialog" tabIndex="-1" aria-modal="true" aria-labelledby="dlg-title" onMouseDown="{{ stopProp }}" style="width:460px;max-width:100%;max-height:100%;overflow:auto;background:#fbfbf9;border:1px solid #d6d5cf;border-radius:6px;box-shadow:0 24px 60px rgba(14,15,18,0.2)">
+        <div style="padding:16px 18px 14px;border-bottom:1px solid #e6e5e0">
+          <div style="display:flex;align-items:center;gap:8px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.12em;text-transform:uppercase;color:{{ d.kc }}"><span style="width:6px;height:6px;background:{{ d.kc }};display:block"></span>{{ d.kicker }}</div>
+          <h2 id="dlg-title" style="margin:7px 0 0;font:500 18px/1.25 'Geist',sans-serif;letter-spacing:-0.02em;overflow-wrap:anywhere">{{ d.title }}</h2>
+          <p style="margin:6px 0 0;font-size:13px;line-height:1.5;color:#62646b;text-wrap:pretty">{{ d.msg }}</p>
+        </div>
+
+        <sc-if value="{{ d.isName }}" hint-placeholder-val="{{ false }}">
+          <form onSubmit="{{ nameSubmit }}" style="padding:16px 18px;display:grid;gap:7px">
+            <label for="dlg-name" style="font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b">{{ d.nameLabel }}</label>
+            <input id="dlg-name" disabled="{{ d.busy }}" autoFocus="{{ true }}" value="{{ d.value }}" onChange="{{ onDlgName }}" maxLength="64" autoComplete="off" spellCheck="false" aria-invalid="{{ d.invalid }}" aria-describedby="dlg-name-help" placeholder="e.g. Savings_2" style="height:36px;padding:0 10px;border:1px solid {{ d.border }};background:#ffffff;border-radius:3px;font:400 13px 'Geist Mono',monospace;color:#0e0f12">
+            <div id="dlg-name-help" style="font-size:12px;line-height:1.45;color:{{ d.helpColor }}">{{ d.help }}</div>
+            <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:8px">
+              <button type="button" onClick="{{ closeDlg }}" disabled="{{ d.busy }}" style="height:32px;padding:0 13px;border:1px solid #d6d5cf;background:#ffffff;color:#0e0f12;border-radius:3px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer">Cancel</button>
+              <button type="submit" disabled="{{ d.busy }}" style="height:32px;padding:0 13px;border:1px solid #0e0f12;background:#0e0f12;color:#ffffff;border-radius:3px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer">{{ d.submit }}</button>
+            </div>
+          </form>
+        </sc-if>
+
+        <sc-if value="{{ d.isPass }}" hint-placeholder-val="{{ false }}">
+          <form onSubmit="{{ passSubmit }}" style="padding:16px 18px;display:grid;gap:7px">
+            <label for="dlg-p1" style="font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b">Passphrase</label>
+            <input id="dlg-p1" type="password" disabled="{{ d.busy }}" autoFocus="{{ true }}" value="{{ d.p1 }}" onChange="{{ onP1 }}" maxLength="511" autoComplete="{{ d.ac }}" aria-invalid="{{ d.invalid }}" aria-describedby="dlg-pass-help" style="height:36px;padding:0 10px;border:1px solid {{ d.border }};background:#ffffff;border-radius:3px;font:400 13px 'Geist Mono',monospace;color:#0e0f12">
+            <sc-if value="{{ d.confirm }}" hint-placeholder-val="{{ false }}">
+              <label for="dlg-p2" style="margin-top:6px;font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b">Confirm passphrase</label>
+              <input id="dlg-p2" type="password" value="{{ d.p2 }}" onChange="{{ onP2 }}" disabled="{{ d.busy }}" maxLength="511" autoComplete="new-password" style="height:36px;padding:0 10px;border:1px solid {{ d.border2 }};background:#ffffff;border-radius:3px;font:400 13px 'Geist Mono',monospace;color:#0e0f12">
+            </sc-if>
+            <div id="dlg-pass-help" role="{{ d.helpRole }}" style="font-size:12px;line-height:1.45;color:{{ d.helpColor }}">{{ d.help }}</div>
+            <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:8px">
+              <button type="button" onClick="{{ closeDlg }}" disabled="{{ d.busy }}" style="height:32px;padding:0 13px;border:1px solid #d6d5cf;background:#ffffff;color:#0e0f12;border-radius:3px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer">Cancel</button>
+              <button type="submit" disabled="{{ d.busy }}" style="height:32px;padding:0 13px;border:1px solid #0e0f12;background:#0e0f12;color:#ffffff;border-radius:3px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer">{{ d.submit }}</button>
+            </div>
+          </form>
+        </sc-if>
+
+        <sc-if value="{{ d.isCreated }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:16px 18px;display:grid;gap:10px">
+            <div style="padding:12px 14px;background:#ffffff;border:1px solid #e6e5e0;border-radius:3px;display:grid;gap:7px">
+              <div style="font:400 10px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#62646b">Back up this wallet</div>
+              <div style="font-size:12.5px;line-height:1.55">Close Laser Core, then copy the encrypted file to a safe place:</div>
+              <code style="display:block;padding:6px 8px;background:#f8f8f6;border:1px solid #e6e5e0;border-radius:2px;font:400 11px 'Geist Mono',monospace;overflow-wrap:anywhere;user-select:all">{{ d.path }}</code>
+              <div style="font-size:12.5px;line-height:1.55;color:#62646b">The file is useless without its passphrase, and the passphrase cannot be recovered. Keep both private.</div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:8px">
+              <button onClick="{{ createdReceive }}" style="height:32px;padding:0 13px;border:1px solid #d6d5cf;background:#ffffff;color:#0e0f12;border-radius:3px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer">Show address</button>
+              <button autoFocus="{{ true }}" onClick="{{ closeDlg }}" style="height:32px;padding:0 13px;border:1px solid #0e0f12;background:#0e0f12;color:#ffffff;border-radius:3px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer">Done</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ d.isReview }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:6px 0 0">
+            <sc-for list="{{ d.rows }}" as="r" hint-placeholder-count="5">
+              <div style="display:grid;grid-template-columns:130px minmax(0,1fr);gap:12px;padding:9px 18px;border-bottom:1px solid #efeee9;font-size:12.5px;align-items:baseline">
+                <span style="color:#62646b">{{ r.k }}</span>
+                <span style="font:{{ r.w }} 12.5px/1.5 'Geist Mono',monospace;color:#0e0f12;text-align:right;overflow-wrap:anywhere;user-select:text">{{ r.v }}</span>
+              </div>
+            </sc-for>
+            <div style="padding:10px 18px;font-size:12px;line-height:1.5;color:#62646b">Shadownet test LASER only. Once the node accepts a transaction it cannot be cancelled.</div>
+            <div style="padding:6px 18px 16px;display:flex;justify-content:flex-end;gap:8px">
+              <button onClick="{{ cancelReview }}" disabled="{{ d.busy }}" style="height:34px;padding:0 13px;border:1px solid #d6d5cf;background:#ffffff;color:#0e0f12;border-radius:3px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer">Cancel</button>
+              <button autoFocus="{{ true }}" onClick="{{ confirmSend }}" disabled="{{ d.busy }}" style="height:34px;padding:0 14px;border:1px solid #0e0f12;background:#0e0f12;color:#ffffff;border-radius:3px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer">{{ d.submit }}</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ d.isResult }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:14px 18px 16px;display:grid;gap:10px">
+            <sc-for list="{{ d.rows }}" as="r" hint-placeholder-count="3">
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:12.5px"><span style="color:#62646b">{{ r.k }}</span><span style="font:500 12.5px 'Geist Mono',monospace;text-align:right;overflow-wrap:anywhere">{{ r.v }}</span></div>
+            </sc-for>
+            <sc-if value="{{ d.hasOut }}" hint-placeholder-val="{{ false }}"><pre style="margin:0;padding:8px 10px;background:#ffffff;border:1px solid #e6e5e0;border-radius:3px;font:400 11px/1.5 'Geist Mono',monospace;white-space:pre-wrap;overflow-wrap:anywhere;color:{{ d.outColor }}">{{ d.out }}</pre></sc-if>
+            <div style="display:flex;justify-content:flex-end;gap:8px">
+              <button autoFocus="{{ true }}" onClick="{{ d.done }}" style="height:32px;padding:0 13px;border:1px solid #0e0f12;background:#0e0f12;color:#ffffff;border-radius:3px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer">{{ d.doneLabel }}</button>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</sc-if>
+
+
+</div>

@@ -1,0 +1,25 @@
+name: desktop-checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Rebuild the static renderer
+        run: |
+          python3 scripts/build-renderer.py
+          git diff --exit-code -- renderer/app.js renderer/template.js renderer/style.css
+      - name: Check desktop behavior and JavaScript syntax
+        run: npm test
