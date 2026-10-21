@@ -21,8 +21,8 @@ wallets, and mines to the wallet you select.
 
 ### 1. Download and verify
 
-1. Open the [Laser Core releases](https://github.com/photonicmoney/laser-core/releases).
-2. Download `Laser-Core-*-portable-x64.exe` and `SHA256SUMS`.
+1. Open the [Laser Core 0.2.0-beta.2 release](https://github.com/photonicmoney/laser-core/releases/tag/v0.2.0-beta.2).
+2. Download `Laser-Core-0.2.0-beta.2-portable-x64.exe` and `SHA256SUMS`.
 3. In PowerShell, calculate the executable hash:
 
 ```powershell
@@ -140,7 +140,7 @@ npm run verify:release -- -ReleaseDir <release-directory>
 
 ## Development
 
-The current source includes the redesigned native Electron interface, with
+The 0.2.0-beta.2 release includes the redesigned native Electron interface, with
 Overview, Send, Receive, Mining, and Network views. It uses the existing
 sandboxed preload bridge and bundled assets. Photon amounts stay exact across
 the native JSON and renderer boundary, and sending rechecks the unlocked
@@ -148,8 +148,7 @@ wallet and spendable balance before signing.
 
 ![Laser Core redesigned interface](docs/laser-core.png)
 
-*Example Shadownet wallet data. This source preview does not change the
-previously published release binaries.*
+*Redesigned interface with example Shadownet wallet data.*
 
 ```powershell
 npm ci

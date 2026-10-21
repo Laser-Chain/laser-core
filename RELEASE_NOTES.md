@@ -1,6 +1,6 @@
 # Laser Core release notes
 
-## Unreleased: desktop redesign
+## 0.2.0-beta.2: desktop redesign (2026-10-21)
 
 - Native Electron Overview, Send, Receive, Mining, and Network views, with a
   matching startup screen and locally bundled fonts and React runtime.
@@ -12,7 +12,10 @@
   pending-spend accounting, and reconciliation of wallet locks and expiry.
 - Renderer workflow tests and automated checks for generated-source drift.
 
-These source changes do not replace the previously published beta binaries.
+The Windows x64 portable beta includes this redesign and the existing
+3.0.0-beta.2 Shadownet node runtime. Download the executable and `SHA256SUMS`
+from the `v0.2.0-beta.2` release. This experimental beta is unsigned; verify
+its checksum before running. Existing release artifacts remain available.
 
 ## Laser Core 0.2.0-beta.1 candidate notes
 

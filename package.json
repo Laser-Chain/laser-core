@@ -1,6 +1,6 @@
 {
   "name": "laser-core",
-  "version": "0.2.0-beta.1",
+  "version": "0.2.0-beta.2",
   "description": "Laser Core - Desktop wallet and mining client for Laser Shadownet",
   "author": "Lightman",
   "private": true,

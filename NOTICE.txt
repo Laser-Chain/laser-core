@@ -1,4 +1,4 @@
-Laser Core 0.2.0-beta.1
+Laser Core 0.2.0-beta.2
 
 Laser Core is experimental testnet software. It is not intended to hold assets
 of value, and its network and storage formats may reset or change.
