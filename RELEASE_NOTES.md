@@ -1,5 +1,11 @@
 # Laser Core release notes
 
+## Unreleased
+
+- Clarify the About dialog's separate desktop app and node engine versions,
+  display the network as Shadownet (testnet), and group runtime, protocol,
+  storage, and connection settings under technical details.
+
 ## 0.2.0-beta.2: desktop redesign (2026-10-21)
 
 - Native Electron Overview, Send, Receive, Mining, and Network views, with a

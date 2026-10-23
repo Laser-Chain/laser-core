@@ -539,14 +539,33 @@ function showBuildDetails(build) {
 
 function showAbout() {
   const { dialog } = require('electron');
+  const build = activeBuildIdentity();
+  const networkName = LASER_NETWORK === 'shadow' ?
+    'Shadownet (testnet)' : LASER_NETWORK;
   dialog.showMessageBox(mainWindow, {
     type: 'info',
     title: 'About Laser Core',
-    message: `Laser Core v${app.getVersion()}`,
-    detail: (() => {
-      const build = activeBuildIdentity();
-      return `Node: ${build.nodeVersion}\nChannel: ${runtime.channel}\nProtocol: ${build.protocol}\nStore format: ${build.storeFormat}\nNetwork: ${LASER_NETWORK}\nP2P bind: ${LASER_LISTEN}\nP2P advertise: ${LASER_ADVERTISE || 'same as bind'}\nRPC: ${LASER_RPC}\nDatadir: ${LASER_DATADIR}\nPeers: ${LASER_PEERS.join(', ') || 'none configured'}\n\nLaser is experimental testnet software.\nSee NOTICE.txt for licensing information.`;
-    })()
+    message: 'Laser Core',
+    detail: [
+      `Desktop app: v${app.getVersion()}`,
+      `Node engine: ${build.nodeVersion}`,
+      `Network: ${networkName}`,
+      '',
+      'The desktop app and node engine are versioned separately.',
+      '',
+      'Technical details',
+      `Runtime channel: ${runtime.channel}`,
+      `Network protocol version: ${build.protocol}`,
+      `Blockchain storage format: ${build.storeFormat}`,
+      `P2P listen address: ${LASER_LISTEN}`,
+      `P2P advertised address: ${LASER_ADVERTISE || 'node default'}`,
+      `RPC address: ${LASER_RPC}`,
+      `Blockchain data directory: ${LASER_DATADIR}`,
+      `Configured peers: ${LASER_PEERS.join(', ') || 'none configured'}`,
+      '',
+      'Laser is experimental testnet software.',
+      'See NOTICE.txt for licensing information.'
+    ].join('\n')
   });
 }
 
