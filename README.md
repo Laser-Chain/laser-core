@@ -226,6 +226,52 @@ See [RELEASE_NOTES.md](RELEASE_NOTES.md),
 [SECURITY_AUDIT.md](SECURITY_AUDIT.md), [NOTICE.txt](NOTICE.txt), and
 [SECURITY.md](SECURITY.md) before distributing or operating the beta.
 
+## Explorer publisher
+
+Every supported Windows x64 package includes the explorer publisher and the
+native `lxe.exe` snapshot helper. Open **Settings → Explorer publisher** or the
+**Network** screen to configure an HTTPS ingest endpoint and a token issued by
+that explorer's operator. Save once to enable publishing on subsequent starts.
+Publishing requires an authorized token; public distributions contain no shared
+server credential. A fresh installation shows **Not configured**.
+
+The Network screen shows export/upload state, the last successfully delivered
+height and time, and errors. These are separate from local mining and node
+height. A full-chain export can take about a minute on larger Shadownet stores;
+upload completion is not instantaneous. Failed exports/uploads retry, uploads
+time out after 30 seconds, and redirects are rejected. Shutdown and disabling
+cancel pending publisher work. Publishing resumes when the local node recovers.
+
+Settings live in `explorer-publisher.json` under Electron's user data directory
+(`%APPDATA%/laser-core` on Windows). Tokens use Electron `safeStorage` encryption
+for the operating system account, never renderer localStorage. Portable extraction
+paths are resolved afresh each launch. Moving settings to another account or
+computer requires re-entering the token. Changing the endpoint also requires a
+new token. **Disable publishing** removes the saved credential and stays disabled
+across restarts. Saving settings applies them immediately without restarting mining.
+
+On the first run without saved settings, Core imports an existing complete
+`LASER_EXPLORER_URL` / `LASER_EXPLORER_TOKEN` pair or the legacy
+`explorer-publish.json` file. `LASER_EXPLORER_CONFIG` can identify that legacy
+file. Successful import saves encrypted credentials; later launches use the saved
+settings even when those environment variables are absent. Original operator
+files are not deleted automatically. Remove obsolete plaintext configuration
+after checking the saved setup. `LXE_BIN` remains a development helper override;
+source launches otherwise use `.runtime/explorer/lxe.exe`. The upload interval
+defaults to 3 seconds **after** export/upload completes (legacy `interval_ms` or
+`LASER_EXPLORER_INTERVAL_MS`, clamped to 3–600 seconds). Unchanged successfully
+delivered tips are not uploaded again. Settings are bound to the selected network.
+
+All electron-builder targets, including `dist:win`, `dist:redesign` and the
+release workflow, run shared before/after packaging checks. They reject missing,
+wrong-architecture, or changed helpers; missing publisher modules; and accidentally
+packaged configuration files. `prepare:v3` stages the helper with its SHA-256
+identity, the packaged resources include that identity, and release `BUILDINFO.txt`
+records `explorer_helper_sha256`. Restage old runtimes before building this version.
+The current native distribution is Windows x64; other OS/architecture targets
+fail with an explicit unsupported-runtime error rather than shipping Windows
+binaries as if they were compatible.
+
 ## License status
 
 No project-wide license grant has been finalized. The source and package are

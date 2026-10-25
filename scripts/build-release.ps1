@@ -81,6 +81,8 @@ try {
   $sourceCommit = (& git -C $AppRepoRoot rev-parse HEAD | Out-String).Trim()
   $sourceDate = (& git -C $AppRepoRoot show -s --format=%cI HEAD | Out-String).Trim()
   $v3Info = Read-KeyValueFile (Join-Path $v3Dir 'BUILDINFO.txt')
+  $explorerHelperIdentity = (& node -e "console.log(require('./scripts/verify-publisher-package').verifyRuntime('.runtime/explorer'))" | Out-String).Trim()
+  if ($LASTEXITCODE -ne 0) { throw 'Explorer publisher runtime verification failed.' }
   $cudaMiner = Join-Path $v3Dir 'laser-cuda-miner.exe'
   $cudaMinerIdentity = if (Test-Path -LiteralPath $cudaMiner -PathType Leaf) {
     (Get-FileHash -LiteralPath $cudaMiner -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -162,6 +164,7 @@ try {
     "node_source_commit=$($v3Info.source_commit)"
     "node_source_dirty=$($v3Info.source_dirty)"
     "cuda_miner_sha256=$cudaMinerIdentity"
+    "explorer_helper_sha256=$explorerHelperIdentity"
     'default_network=shadow'
     'wire_protocol=3'
     'block_store_version=3'

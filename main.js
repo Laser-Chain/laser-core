@@ -6,6 +6,7 @@ const {
   Menu,
   net,
   protocol,
+  safeStorage,
   session
 } = require('electron');
 const { execFile, execFileSync, spawn } = require('child_process');
@@ -26,10 +27,7 @@ const {
   restoreEncryptedWallet,
   walletFilePath
 } = require('./wallet-files');
-const {
-  ExplorerPublisher,
-  resolvePublisherConfig
-} = require('./explorer-publisher');
+const { PublisherService } = require('./explorer-publisher-service');
 const {
   blockCount,
   miningIntensity,
@@ -298,6 +296,7 @@ function startNode() {
       updateSplash('Node failed: ' + nodeStartupError, 100);
     }
     laserdProcess = null;
+    explorerPublisher?.setNodeReady(false);
     if (shadowProcess && !hasProcessExited(shadowProcess)) shadowProcess.kill();
   });
 
@@ -496,7 +495,7 @@ function createWindow() {
     {
       label: 'Settings',
       submenu: [
-        { label: 'Options...', enabled: false }
+        { label: 'Explorer publisher...', click: () => mainWindow?.webContents.send('publisher:settings') }
       ]
     },
     {
@@ -731,13 +730,25 @@ registerSplashHandler('splash:identity', () => ({
 }));
 
 registerMainHandler('laser:status', async () => {
-  const raw = await laserCmd([
-    'node', 'status', '--rpc', LASER_RPC,
-    '--datadir', LASER_DATADIR, '--network', LASER_NETWORK, '--json'
-  ]);
-  const status = parseExactJSON(raw);
-  updateMiningBackend(status);
-  return { ...status, shadow: currentShadowState() };
+  try {
+    const raw = await laserCmd([
+      'node', 'status', '--rpc', LASER_RPC,
+      '--datadir', LASER_DATADIR, '--network', LASER_NETWORK, '--json'
+    ]);
+    const status = parseExactJSON(raw);
+    updateMiningBackend(status);
+    explorerPublisher?.setNodeReady(true);
+    return { ...status, shadow: currentShadowState() };
+  } catch (error) {
+    explorerPublisher?.setNodeReady(false);
+    throw error;
+  }
+});
+
+registerMainHandler('laser:publisher-status', () => explorerPublisher?.status() || { state: 'starting', enabled: false });
+registerMainHandler('laser:publisher-save', (_event, input) => {
+  if (!explorerPublisher) throw new Error('Publisher is still starting. Try again shortly.');
+  return explorerPublisher.save(input);
 });
 
 registerMainHandler('laser:peers', async () => {
@@ -1153,19 +1164,15 @@ app.whenReady().then(async () => {
     updateSplash(researchPaused(mineIntensity) ? 'Shadownet node ready · background research paused' : 'Shadownet node and PhotonHash observer ready', 100);
   }
 
-  const publisherConfig = resolvePublisherConfig({
+  explorerPublisher = new PublisherService({
     appDir: __dirname,
     userData: app.getPath('userData'),
-    resourcesPath: process.resourcesPath
+    resourcesPath: process.resourcesPath,
+    datadir: LASER_DATADIR,
+    network: LASER_NETWORK,
+    safeStorage
   });
-  if (nodeResult.ready && publisherConfig) {
-    explorerPublisher = new ExplorerPublisher(
-      publisherConfig,
-      LASER_DATADIR,
-      LASER_NETWORK
-    );
-    explorerPublisher.start();
-  }
+  explorerPublisher.initialize(nodeResult.ready);
 
   createWindow();
   mainWindow.once('ready-to-show', () => {

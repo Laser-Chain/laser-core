@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Every supported Windows x64 package must include the publisher service,
+  snapshot helper and helper SHA-256 identity. All packaging paths validate
+  the staged runtime and the resulting application archive.
+- Configure publishing from Settings → Explorer publisher or Network. Save an
+  operator-issued token once; credentials are encrypted for the OS account and
+  restored automatically on subsequent portable launches. Existing launch/file
+  configuration is imported on first use. No server token is bundled.
+- Show export/upload progress, last delivered height/time and actionable errors
+  separately from mining. Retry failures, bound upload time, reject redirects,
+  cancel work on disable/shutdown, and resume after the local node recovers.
+
 - Add saved mining intensity presets from Minimal (10%) through Full (100%),
   with changes taking effect on the next mining cycle. Minimal and Quiet pause
   the optional research observer while the node and miner continue running.

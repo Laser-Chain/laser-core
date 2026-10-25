@@ -43,6 +43,9 @@ if (-not $explorerSource) {
 $explorerOutput = Join-Path $AppDir '.runtime\explorer'
 New-Item -ItemType Directory -Path $explorerOutput -Force | Out-Null
 Copy-Item -LiteralPath $explorerSource -Destination (Join-Path $explorerOutput 'lxe.exe') -Force
+$explorerHash = (Get-FileHash -LiteralPath (Join-Path $explorerOutput 'lxe.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
+@('format=laser-explorer-runtime-v1', "lxe_sha256=$explorerHash") |
+  Set-Content -LiteralPath (Join-Path $explorerOutput 'BUILDINFO.txt') -Encoding ascii
 $cudaSource = Join-Path $sourceBuild 'laser-cuda-miner.exe'
 $cudaOutput = Join-Path $output 'laser-cuda-miner.exe'
 if (Test-Path -LiteralPath $cudaSource -PathType Leaf) {

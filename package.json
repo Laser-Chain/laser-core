@@ -20,7 +20,7 @@
     "dist:win": "electron-builder --win portable --x64",
     "release:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-release.ps1",
     "verify:release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-release.ps1",
-    "check": "node --check main.js && node --check explorer-publisher.js && node --check ipc-validation.js && node --check runtime-config.js && node --check preload.js && node --check splash-preload.js && node --check renderer/app.js && node --check renderer/splash.js && node --check exact-json.js && node --check renderer/template.js",
+    "check": "node --check main.js && node --check explorer-publisher.js && node --check explorer-publisher-settings.js && node --check explorer-publisher-service.js && node --check scripts/verify-publisher-package.js && node --check ipc-validation.js && node --check runtime-config.js && node --check preload.js && node --check splash-preload.js && node --check renderer/app.js && node --check renderer/splash.js && node --check exact-json.js && node --check renderer/template.js",
     "test": "node --test test/*.test.js && npm run check",
     "build:ui": "python scripts/build-renderer.py",
     "dist:redesign": "electron-builder --win portable --x64 -c.directories.output=dist/redesign -c.artifactName=Laser-Core-Redesign-x64.exe"
@@ -61,7 +61,9 @@
       "NOTICE.txt",
       "RELEASE_NOTES.md",
       "package.json",
-      "exact-json.js"
+      "exact-json.js",
+      "explorer-publisher-settings.js",
+      "explorer-publisher-service.js"
     ],
     "extraResources": [
       {
@@ -96,6 +98,10 @@
       {
         "from": ".runtime/explorer/lxe.exe",
         "to": "bin/explorer/lxe.exe"
+      },
+      {
+        "from": ".runtime/explorer/BUILDINFO.txt",
+        "to": "bin/explorer/BUILDINFO.txt"
       }
     ],
     "win": {
@@ -109,6 +115,8 @@
       ],
       "icon": "packaging/laser-core.ico",
       "executableName": "Laser Core"
-    }
+    },
+    "beforePack": "./scripts/publisher-before-pack.js",
+    "afterPack": "./scripts/publisher-after-pack.js"
   }
 }

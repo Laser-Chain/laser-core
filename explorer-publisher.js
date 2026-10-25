@@ -1,52 +1,36 @@
 const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { readLegacy, validateEndpoint, validateToken, interval } = require('./explorer-publisher-settings');
 
-function readJson(file) {
-  try {
-    return JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch (_) {
-    return null;
-  }
-}
-
-function resolvePublisherConfig(options = {}) {
+function resolvePublisherBinary(options = {}) {
   const env = options.env || process.env;
   const appDir = options.appDir || __dirname;
-  const userData = options.userData || '';
   const resourcesPath = options.resourcesPath || '';
   const exists = options.exists || fs.existsSync;
   const suffix = process.platform === 'win32' ? '.exe' : '';
-  const fileConfig = [
-    env.LASER_EXPLORER_CONFIG,
-    userData && path.join(userData, 'explorer-publish.json'),
-    path.join(appDir, 'explorer-publish.json')
-  ].filter(Boolean).map(readJson).find(Boolean) || {};
-  const url = env.LASER_EXPLORER_URL || fileConfig.url || '';
-  const token = env.LASER_EXPLORER_TOKEN || fileConfig.token || '';
   const candidates = [
     env.LXE_BIN,
-    fileConfig.lxe,
-    resourcesPath && path.join(resourcesPath, 'bin', 'explorer', 'lxe' + suffix)
+    options.legacyBinary,
+    resourcesPath && path.join(resourcesPath, 'bin', 'explorer', 'lxe' + suffix),
+    path.join(appDir, '.runtime', 'explorer', 'lxe' + suffix)
   ].filter(Boolean);
-  const lxe = candidates.find(candidate => exists(candidate));
-  const requestedInterval = Number(
-    fileConfig.interval_ms || env.LASER_EXPLORER_INTERVAL_MS || 3000
-  );
-  const intervalMs = Number.isFinite(requestedInterval)
-    ? Math.max(3000, Math.min(requestedInterval, 600000))
-    : 3000;
-  if (!url || !token || !lxe) return null;
+  return candidates.find(candidate => exists(candidate)) || null;
+}
+
+function resolvePublisherConfig(options = {}) {
   try {
-    const endpoint = new URL(url);
-    if (endpoint.protocol !== 'https:') return null;
-    return { url: endpoint.href, token, lxe, intervalMs };
+    const legacy = readLegacy(options);
+    if (!legacy) return null;
+    const lxe = resolvePublisherBinary({ ...options, legacyBinary: legacy.lxe });
+    if (!lxe) return null;
+    return { url: validateEndpoint(legacy.url), token: validateToken(legacy.token), lxe, intervalMs: interval(legacy.interval_ms) };
   } catch (_) {
     return null;
   }
 }
 
-function runLxe(binary, datadir, network, args, timeout = 120000) {
+function runLxe(binary, datadir, network, args, timeout = 120000, signal) {
   return new Promise((resolve, reject) => {
     execFile(
       binary,
@@ -54,6 +38,7 @@ function runLxe(binary, datadir, network, args, timeout = 120000) {
       {
         encoding: 'utf8',
         timeout,
+        signal,
         windowsHide: true,
         maxBuffer: 128 * 1024 * 1024
       },
@@ -72,8 +57,8 @@ function runLxe(binary, datadir, network, args, timeout = 120000) {
   });
 }
 
-async function buildSnapshot(config, datadir, network, run = runLxe) {
-  const snapshot = await run(config.lxe, datadir, network, ['snapshot']);
+async function buildSnapshot(config, datadir, network, run = runLxe, signal) {
+  const snapshot = await run(config.lxe, datadir, network, ['snapshot'], 120000, signal);
   const height = Number(snapshot?.tip?.height);
   if (
     snapshot?.schema !== 1 ||
@@ -90,10 +75,12 @@ async function buildSnapshot(config, datadir, network, run = runLxe) {
   return snapshot;
 }
 
-async function sendSnapshot(config, snapshot, request = globalThis.fetch) {
+async function sendSnapshot(config, snapshot, request = globalThis.fetch, signal) {
   if (typeof request !== 'function') throw new Error('HTTPS fetch is unavailable');
   const response = await request(config.url, {
     method: 'POST',
+    redirect: 'error',
+    signal: AbortSignal.any([AbortSignal.timeout(30000), ...(signal ? [signal] : [])]),
     headers: {
       Authorization: `Bearer ${config.token}`,
       'Content-Type': 'application/json'
@@ -101,10 +88,12 @@ async function sendSnapshot(config, snapshot, request = globalThis.fetch) {
     body: JSON.stringify(snapshot)
   });
   if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Explorer ingest failed (${response.status}): ${body.slice(0, 240)}`);
+    // Do not reflect server content (which could echo the bearer token) into IPC/logs.
+    throw new Error(`Explorer ingest failed (HTTP ${response.status}).`);
   }
-  return await response.json();
+  const result = await response.json();
+  if (result?.ok !== true) throw new Error('Explorer did not acknowledge the upload.');
+  return result;
 }
 
 class ExplorerPublisher {
@@ -118,11 +107,20 @@ class ExplorerPublisher {
     this.stopped = true;
     this.running = false;
     this.lastTip = '';
+    this.onStatus = options.onStatus || (() => {});
+    this.controller = null;
+    this.status = { state: 'stopped', lastPublishedAt: null, lastHeight: null, error: null };
+  }
+
+  report(patch) {
+    this.status = { ...this.status, ...patch };
+    this.onStatus({ ...this.status });
   }
 
   start() {
     if (!this.stopped) return;
     this.stopped = false;
+    this.report({ state: 'waiting', error: null });
     this.schedule(0);
   }
 
@@ -130,6 +128,8 @@ class ExplorerPublisher {
     this.stopped = true;
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
+    this.controller?.abort();
+    this.report({ state: 'stopped' });
   }
 
   schedule(delay) {
@@ -140,18 +140,32 @@ class ExplorerPublisher {
   async tick() {
     if (this.stopped || this.running) return;
     this.running = true;
+    this.controller = new AbortController();
+    let phase = 'snapshot';
     try {
-      const snapshot = await this.build(this.config, this.datadir, this.network);
+      this.report({ state: 'exporting' });
+      const snapshot = await this.build(this.config, this.datadir, this.network, undefined, this.controller.signal);
+      if (this.stopped) return;
       const identity = `${snapshot.tip.height}:${snapshot.tip.tip}`;
       if (identity !== this.lastTip) {
-        await this.send(this.config, snapshot);
+        phase = 'upload';
+        this.report({ state: 'uploading' });
+        await this.send(this.config, snapshot, undefined, this.controller.signal);
+        if (this.stopped) return;
         this.lastTip = identity;
-        console.log(`[explorer-publisher] mirrored height ${snapshot.tip.height}`);
+        this.report({ lastPublishedAt: Date.now(), lastHeight: snapshot.tip.height });
       }
+      this.report({ state: 'current', error: null });
     } catch (error) {
-      console.warn('[explorer-publisher]', error.message);
+      if (!this.stopped) {
+        const http = /^Explorer ingest failed \(HTTP \d{3}\)\.$/.test(error.message) ? error.message : '';
+        this.report({ state: 'error', error: http || (phase === 'snapshot'
+          ? 'Snapshot export failed. Check the local node and bundled explorer helper.'
+          : 'Upload failed or timed out. Check the endpoint, token, and network connection.') });
+      }
     } finally {
       this.running = false;
+      this.controller = null;
       this.schedule(this.config.intervalMs);
     }
   }
@@ -161,6 +175,7 @@ module.exports = {
   ExplorerPublisher,
   buildSnapshot,
   resolvePublisherConfig,
+  resolvePublisherBinary,
   runLxe,
   sendSnapshot
 };

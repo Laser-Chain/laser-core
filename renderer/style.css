@@ -58,6 +58,8 @@ input::placeholder{color:#a9aab0}
 .mining-intensity-copy p{margin:0 0 4px}
 .mining-intensity-copy span{font:400 10.5px 'Geist Mono',monospace;color:#0e0f12}
 
+.publisher-panel{background:#fff;border:1px solid #e6e5e0;border-radius:4px;padding:14px 18px;min-width:0}.publisher-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.publisher-heading h2{margin:0;font:500 13px Geist,sans-serif}.publisher-heading span{font:400 11px "Geist Mono",monospace}.publisher-panel p{font-size:12px;line-height:1.5;color:#62646b;margin:8px 0}.publisher-panel .publisher-endpoint{overflow-wrap:anywhere;font-family:"Geist Mono",monospace}.publisher-panel .publisher-error{color:#a1203d}.publisher-form{display:grid;gap:8px;max-width:600px;margin:16px 0}.publisher-form label{font-size:12px}.publisher-form input{width:100%;box-sizing:border-box;height:36px;padding:0 10px;border:1px solid #d6d5cf;border-radius:3px;background:#fff;color:#0e0f12;font:400 12px "Geist Mono",monospace}.publisher-actions{display:flex;gap:8px;flex-wrap:wrap}.publisher-actions button{padding:7px 11px;border:1px solid #d6d5cf;background:#fff;border-radius:3px;font:500 11px Geist,sans-serif;color:#0e0f12;cursor:pointer}
+
 .hover-18:hover{background:#ffffff!important;color:#0e0f12!important}
 .hover-33:hover{background:#f4f4f1!important}
 .hover-81:hover{background:#2b2d33!important}

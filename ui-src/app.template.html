@@ -590,6 +590,25 @@
     </section>
   </div>
 
+  <section aria-label="Explorer publisher" class="publisher-panel">
+    <div class="publisher-heading"><h2>Explorer publisher</h2><span role="status">{{ publisher.label }}</span></div>
+    <p>{{ publisher.detail }}</p>
+    <p class="publisher-endpoint">{{ publisher.url }}</p>
+    <p>Shares public chain snapshots with your explorer. Delivery can lag while a full snapshot exports. Mining and local block height are shown separately.</p>
+    <sc-if value="{{ publisher.hasError }}"><p role="alert" class="publisher-error">{{ publisher.error }}</p></sc-if>
+    <sc-if value="{{ publisher.editing }}">
+      <form onSubmit="{{ publisher.save }}" class="publisher-form">
+        <label for="publisher-url">HTTPS ingest URL</label>
+        <input id="publisher-url" type="url" value="{{ publisher.draft.url }}" onChange="{{ publisher.onUrl }}" maxLength="2048" required="{{ true }}" disabled="{{ publisher.busy }}" autoComplete="off" spellCheck="false" placeholder="https://your-explorer.example/api/ingest">
+        <label for="publisher-token">Publisher token</label>
+        <input id="publisher-token" type="password" value="{{ publisher.draft.token }}" onChange="{{ publisher.onToken }}" maxLength="4096" disabled="{{ publisher.busy }}" autoComplete="off" aria-describedby="publisher-token-help">
+        <p id="publisher-token-help">{{ publisher.tokenHelp }} Credentials are encrypted for your operating system account and saved on this computer.</p>
+        <div class="publisher-actions"><button type="submit" disabled="{{ publisher.busy }}">Save and enable</button><button type="button" onClick="{{ publisher.cancel }}" disabled="{{ publisher.busy }}">Cancel</button></div>
+      </form>
+    </sc-if>
+    <div class="publisher-actions"><button onClick="{{ publisher.edit }}" disabled="{{ publisher.busy }}">Configure publisher</button><sc-if value="{{ publisher.enabled }}"><button onClick="{{ publisher.disable }}" disabled="{{ publisher.busy }}">Disable publishing</button></sc-if></div>
+  </section>
+
   <section aria-label="LF2-K8 observer" style="background:#ffffff;border:1px solid #e6e5e0;border-radius:4px;min-width:0;padding:14px 18px;display:flex;gap:12px 20px;align-items:center;flex-wrap:wrap">
     <div style="display:flex;align-items:center;gap:8px;font:400 10.5px 'Geist Mono',monospace;letter-spacing:0.1em;text-transform:uppercase"><span style="width:6px;height:6px;background:#00897d;display:block"></span>LF2-K8 Shadow observer</div>
     <span style="padding:2px 7px;border:1px solid #e6e5e0;border-radius:2px;font:500 10px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;color:#62646b">Non-consensus</span>

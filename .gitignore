@@ -5,6 +5,8 @@ wallets/
 /server.js
 /public/
 /explorer-publish.json
+/explorer-publisher.json
+/explorer-publisher.json.*.tmp
 .env
 .env.*
 .npmrc

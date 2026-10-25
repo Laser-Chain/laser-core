@@ -22,6 +22,13 @@ contextBridge.exposeInMainWorld('laser', {
   mineStatus: () => ipcRenderer.invoke('laser:mine-status'),
   send: (from, to, amount, fee) => ipcRenderer.invoke('laser:send', from, to, amount, fee),
   config: () => ipcRenderer.invoke('laser:config'),
+  publisherStatus: () => ipcRenderer.invoke('laser:publisher-status'),
+  publisherSave: (settings) => ipcRenderer.invoke('laser:publisher-save', settings),
+  onPublisherSettings: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on('publisher:settings', listener);
+    return () => ipcRenderer.removeListener('publisher:settings', listener);
+  },
   onBlockMined: (cb) => {
     const listener = (_e, state) => cb(state);
     ipcRenderer.on('mine:block-mined', listener);

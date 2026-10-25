@@ -41,6 +41,7 @@ class Component extends React.Component {
       wallets: [], selected: '', unlocked: {}, records: {}, metricsByWallet: {}, metrics: null, metricsErr: null, metricsAt: null, walletErr: null,
       mining: null, solves: [], activity: [], dlg: null, toast: null,
       intensity: this.savedIntensity(), intensityBusy: false,
+      publisher: null, publisherDraft: null, publisherBusy: false, publisherError: null,
       send: { to: '', label: '', from: '', amount: '', subtract: false, fee: '0.01', feeCustom: '', touched: {} },
       contacts: this.loadContacts(), copiedAt: 0,
       mineErr: null, mineBusy: false, mineWallet: '', intervalStr: '10', onceStr: '1', onceBusy: false, onceMsg: null, cfg: null, showDetail: false
@@ -223,6 +224,7 @@ class Component extends React.Component {
     }),m.onMineError((msg,st)=>{
       if(!this.destroyed) this.setState(s=>({mining:st,mineErr:msg,activity:[this.ev('err','Mining cycle failed',msg),...s.activity].slice(0,60)}));
     })];
+    this.subscriptions.push(m.onPublisherSettings(() => this.editPublisher()));
     this.openMain();
   }
 
@@ -286,8 +288,26 @@ class Component extends React.Component {
         return { node, activity: act.slice(0, 60), metrics:status?s.metrics:null, metricsByWallet:status?s.metricsByWallet:{} };
       });
       try { const st = await m.mineStatus(); if (m === this.m) this.setState({ mining: st }); } catch (e) { }
+      try { const publisher = await m.publisherStatus(); if (m === this.m) this.setState({ publisher }); }
+      catch (_) { this.setState({ publisher: { state: 'unavailable', error: 'Publisher status is unavailable.' } }); }
       await this.refreshSelected();
     } finally { this.polling = false; }
+  }
+
+  editPublisher() {
+    this.setState({ view: 'network', publisherError: null, publisherDraft: { url: this.state.publisher?.url || '', token: '' } });
+  }
+
+  async savePublisher(enabled, event) {
+    event?.preventDefault();
+    if (this.state.publisherBusy) return;
+    const draft = this.state.publisherDraft || {};
+    this.setState({ publisherBusy: true, publisherError: null, publisherDraft: { ...draft, token: '' } });
+    try {
+      const publisher = await this.m.publisherSave({ enabled, url: draft.url, token: draft.token });
+      this.setState({ publisher, publisherDraft: null });
+    } catch (error) { this.setState({ publisherError: error.message }); }
+    finally { this.setState({ publisherBusy: false }); }
   }
 
   async refreshSelected() {
@@ -729,6 +749,22 @@ class Component extends React.Component {
     const cf = s.cfg || {};
     const cfgRows = [['Network', cf.network], ['RPC', cf.rpc], ['Listen', cf.listen], ['Advertise', cf.advertise || 'Not set'], ['Data directory', cf.datadir], ['Channel · store', cf.channel ? `${cf.channel} · v${cf.storeVersion}` : null], ['CUDA miner helper', cf.cudaMiner || 'Not configured']].map(([k, val]) => ({ k, v: val == null ? '—' : String(val) }));
 
+    const pub = s.publisher || { state: 'starting' };
+    const publisherLabels = { starting: 'Starting', unconfigured: 'Not configured', 'waiting-node': 'Waiting for local node',
+      waiting: 'Starting publisher', exporting: 'Exporting chain snapshot', uploading: 'Uploading snapshot', current: 'Snapshot delivered',
+      error: 'Publishing failed', stopped: 'Stopped', unavailable: 'Status unavailable' };
+    const publisher = {
+      label: publisherLabels[pub.state] || 'Unknown', enabled: pub.enabled, url: pub.url || 'No endpoint configured',
+      detail: pub.lastPublishedAt ? `Last delivered #${grp(pub.lastHeight)} · ${ago(s.now - pub.lastPublishedAt)}` : 'No snapshot delivered in this session',
+      error: s.publisherError || pub.error, hasError: !!(s.publisherError || pub.error),
+      editing: !!s.publisherDraft, busy: s.publisherBusy, draft: s.publisherDraft || {},
+      tokenHelp: pub.enabled ? 'Leave blank to keep the saved token for this endpoint.' : 'Use a token issued by your explorer operator.',
+      edit: () => this.editPublisher(), cancel: () => this.setState({ publisherDraft: null, publisherError: null }),
+      onUrl: e => this.setState(z => ({ publisherDraft: { ...z.publisherDraft, url: e.target.value } })),
+      onToken: e => this.setState(z => ({ publisherDraft: { ...z.publisherDraft, token: e.target.value } })),
+      save: e => this.savePublisher(true, e), disable: () => this.savePublisher(false)
+    };
+
     // status bar
     const sbar = [
       { text: online ? 'Node online' : offline ? 'Node offline' : 'Connecting', dot: online ? OK : offline ? ERR : '#c9c8c1', fg: online ? INK : offline ? ERR : SUB, r: '50%', title: online ? 'Local RPC ready. This is not a sync percentage.' : N.err || '' },
@@ -737,6 +773,7 @@ class Component extends React.Component {
     ];
     if (!compact) sbar.push({ text: st ? `Mempool ${st.mempool}` : 'Mempool —', dot: 'transparent', fg: online ? SUB : FAINT, r: '0', title: 'Transactions waiting in the local mempool' });
     sbar.push({ text: mining ? `Mining · ${ms.wallet}` : 'Miner idle', dot: mining ? '#2a5cf5' : '#d6d5cf', fg: mining ? '#2a5cf5' : SUB, r: '0', title: 'Continuous mining' });
+    if (pub.enabled || pub.error) sbar.push({ text: pub.error ? 'Explorer upload failed' : 'Explorer publisher', dot: pub.error ? ERR : '#0a84c8', fg: pub.error ? ERR : SUB, r: '0', title: publisher.label + ' · ' + publisher.detail });
     const sbarRight = winW >= 1000 ? (N.lastOk ? `Updated ${ago(s.now - N.lastOk)}` : '') : '';
 
     // dialog
@@ -778,6 +815,7 @@ class Component extends React.Component {
     return {
       showPreviewNote:false, buildLabel: N.startup ? 'v'+(N.startup.appVersion||'0.2.0-beta.1')+' · channel '+N.startup.channel : 'Starting…',
       isSplash: s.phase === 'splash', isMain: s.phase === 'main', sp, desk, win,
+      publisher,
 
       nav, sb, sbMine, sbWal, head, v, banner, showDetail: s.showDetail, toggleDetail: () => this.setState(z => ({ showDetail: !z.showDetail })),
       selected: sel, walletOpts, noWallets, wb, bal, copyLabel, copyAddr: () => this.copyAddr(),
