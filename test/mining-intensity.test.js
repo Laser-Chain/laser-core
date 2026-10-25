@@ -1,0 +1,83 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const test = require('node:test');
+const { miningIntensity, blockCount } = require('../ipc-validation');
+const { researchPaused } = require('../mining-preferences');
+
+function harness(channel = 'v3', savedIntensity = 100) {
+  const handlers = new Map(), jobs = [], timers = [], controls = [];
+  const source = fs.readFileSync(path.join(__dirname, '../main.js'), 'utf8');
+  const miningSource = source.slice(source.indexOf('function miningIntensityArgs('), source.indexOf("registerMainHandler('laser:send'"));
+  const context = {
+    runtime: { channel }, miningIntensity, blockCount, walletName: n => n,
+    path, app: {getPath: () => 'isolated'},
+    loadMiningPreferences: () => ({intensity:savedIntensity,saved:true}),
+    saveMiningPreferences: (_file, intensity) => controls.push(['save-intensity',intensity]),
+    researchPaused, nodeReady:true, shadowError:null,
+    stopShadow: async () => {controls.push(['pause-research']);return true;},
+    startShadow: () => {controls.push(['resume-research']);return true;},
+    registerMainHandler: (name, fn) => handlers.set(name, fn),
+    walletCommand: (args, wallet, timeout) => new Promise((resolve, reject) => jobs.push({args, wallet, timeout, resolve, reject})),
+    queryMinerMetrics: async () => ({ total_mined_photons: '0' }),
+    lockWalletSecret() {}, laserCmd: async args => controls.push(args),
+    setTimeout: fn => {timers.push(fn);return timers.length;}, clearTimeout() {},
+    LASER_RPC: 'test', LASER_DATADIR: 'isolated', LASER_NETWORK: 'regtest',
+    miningBackend: 'cuda', cudaAvailable: true, powProfile: 'v02', mainWindow: null,
+    Date, console
+  };
+  vm.runInNewContext(miningSource, context);
+  return { jobs, timers, controls, call: (name, ...args) => handlers.get('laser:' + name)(null, ...args) };
+}
+
+test('an intensity change preserves the active job and reaches the next cycle', async () => {
+  const h = harness();
+  await h.call('mine-start', 'Example', 10000, 25);
+  assert.ok(h.jobs[0].args.includes('--intensity'));
+  assert.equal(h.jobs[0].args[h.jobs[0].args.indexOf('--intensity') + 1], '25');
+  assert.equal(h.jobs[0].timeout, 480000);
+  const controlCount = h.controls.length;
+  const changed = await h.call('mine-intensity', 10);
+  assert.equal(changed.mining, true);assert.equal(changed.active_intensity, 25);assert.equal(changed.intensity, 10);
+  assert.equal(h.jobs.length, 1);assert.equal(h.controls.length, controlCount+2);
+  assert.ok(!h.controls.some(args=>args.includes('mine-stop')));
+  h.jobs[0].resolve('Mined');await new Promise(r => setImmediate(r));
+  assert.equal(h.call('mine-status').active_intensity, null);
+  h.timers.shift()();assert.equal(h.jobs.length, 2);
+  assert.equal(h.jobs[1].args[h.jobs[1].args.indexOf('--intensity') + 1], '10');
+  assert.equal(h.jobs[1].timeout, 1200000);
+  await h.call('mine-stop');assert.ok(h.controls.some(args=>args.includes('mine-stop')));
+  h.jobs[1].reject(new Error('Cancelled'));await new Promise(r => setImmediate(r));
+  assert.equal(h.timers.length, 0);assert.equal(h.call('mine-status').mining, false);
+});
+
+test('invalid intensity cannot start a job and old runtimes reject throttling explicitly', async () => {
+  const h = harness();
+  await assert.rejects(h.call('mine-start', 'Example', 10000, 0));
+  await assert.rejects(h.call('mine', 'Example', 1, 101));
+  await assert.rejects(h.call('mine-intensity', 25.5));
+  assert.equal(h.jobs.length, 0);
+  const old = harness('sandbox-v2');
+  await assert.rejects(old.call('mine-start', 'Example', 10000, 25), /v3/);
+  await old.call('mine-start', 'Example', 10000, 100);
+  assert.ok(!old.jobs[0].args.includes('--intensity'));
+  old.jobs[0].resolve('Mined');await new Promise(r => setImmediate(r));
+});
+
+test('saved low intensity pauses research and higher settings resume it without stopping mining', async () => {
+  const h=harness('v3',10);
+  assert.equal(h.call('mine-status').intensity,10);
+  assert.equal(h.call('mine-status').research_paused,true);
+  await h.call('mine-start','Example',10000,10);
+  assert.ok(h.controls.some(c=>c[0]==='pause-research'));
+  await h.call('mine-intensity',50);
+  assert.equal(h.call('mine-status').research_paused,false);
+  assert.equal(h.call('mine-status').mining,true);
+  assert.ok(h.controls.some(c=>c[0]==='resume-research'));
+  assert.equal(h.jobs.length,1);
+  assert.equal(h.call('mine-status').active_intensity,10);
+  assert.ok(!h.controls.some(c=>c.includes('mine-stop')));
+  h.jobs[0].resolve('Mined');await new Promise(r=>setImmediate(r));
+});

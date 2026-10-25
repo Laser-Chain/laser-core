@@ -66,12 +66,45 @@ passphrase private. Use **Restore** to import an encrypted wallet backup.
 
 ### 4. Mine on Shadownet
 
+The intensity controls described here are on `main`; the current tagged
+`v0.2.0-beta.2` download predates them. See [release notes](RELEASE_NOTES.md).
+
 1. Wait until the node is online and has at least one peer.
 2. Create or open your wallet.
 3. Open **Mining**. The active wallet should already be selected.
 4. Choose the interval between mining cycles; `10` seconds is a sensible
    starting value.
-5. Select **Start Mining**.
+5. Choose **Mining intensity**: Minimal (10%), Quiet (25%), Balanced (50%),
+   High (75%), or Full (100%). Try Quiet when using the computer for other work.
+6. Select **Start Mining**.
+
+Intensity is saved on this computer and can be changed while mining; the new
+choice applies to the next cycle. Lower settings use smaller CUDA batches and
+insert rests between work batches. CPU fallback also rests between short work
+periods. The percentage is a work/rest target, not a GPU power limit or a promise
+of the same utilization reading in Task Manager. Full preserves the original
+unthrottled behavior. Lower intensity reduces mining throughput. The cycle
+interval remains a separate pause between completed blocks; neither setting
+changes consensus, difficulty, or the network block target.
+
+Minimal and Quiet also pause the optional LF2-K8 research observer, whose
+matrix-bank preparation is separate from consensus mining. This avoids its
+CPU bursts while leaving the validating node and miner running. Balanced,
+High, and Full resume the observer. The choice is stored before startup so
+low-intensity sessions do not launch the observer after a restart. Paused
+research is shown explicitly in the app; no research measurements are
+produced while it is paused. GPU clocks and fans remain controlled by the
+device driver and firmware, so an intensity percentage is not a fan-speed cap.
+Minimal keeps GPU mining enabled but works on one nonce with one CUDA thread
+block. Quiet uses up to eight nonces and four CUDA thread blocks. Each block
+walks the remaining matrix rows sequentially, then the host rests between
+nonce batches. This limits simultaneous GPU work without extending GPU boost
+time through many tiny launches. Successful batches also take their scheduled
+rest. Windows uses a local high-resolution timer, with a normal sleep fallback.
+
+The v3 CLI also accepts `laser node mine <wallet> [N] --intensity 10` together
+with the usual `--rpc`, `--datadir`, and `--network` options. Older sandbox-v2
+runtimes continue to support Full intensity only.
 
 The Mining tab reports session blocks, rewards, solve time, errors, backend,
 and lifetime totals for the loaded wallet. Select **Stop Mining** before
@@ -168,7 +201,10 @@ With the native runtimes staged, `npm run dist:redesign` produces a local
 portable preview in `dist/redesign/`. Use the release workflow below when
 preparing a distributable release.
 
-Packaging also requires a compatible Laser node source checkout. Set
+Packaging also requires a compatible Laser node source checkout with the
+mining-intensity CLI and RPC update. Rebuild the CLI, daemon, and optional CUDA
+helper together; earlier v3 binaries do not support the new intensity argument.
+Set
 `LASER_SOURCE_DIR` to that checkout, build its Windows node binaries, prepare
 the compatibility runtime, and build the client:
 

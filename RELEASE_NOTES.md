@@ -2,9 +2,23 @@
 
 ## Unreleased
 
+- Add saved mining intensity presets from Minimal (10%) through Full (100%),
+  with changes taking effect on the next mining cycle. Minimal and Quiet pause
+  the optional research observer while the node and miner continue running.
+- Reduce simultaneous CUDA work at low intensity and pace GPU and CPU mining
+  through the matching native runtime update. Intensity controls workload; it
+  does not set a device power limit or guarantee a particular fan speed.
+- Display receiving addresses as one continuous string and simplify the
+  transaction-submission receipt, keeping the full recipient and exact amounts
+  available without treating submission as network confirmation.
 - Clarify the About dialog's separate desktop app and node engine versions,
   display the network as Shadownet (testnet), and group runtime, protocol,
   storage, and connection settings under technical details.
+
+These changes are on `main`; the existing `v0.2.0-beta.2` download is unchanged.
+Builds with mining intensity require the matching Laser node update that
+supports `--intensity` and the optional intensity field in the `MINE` RPC.
+Rebuild and stage that runtime before packaging the desktop app.
 
 ## 0.2.0-beta.2: desktop redesign (2026-10-21)
 

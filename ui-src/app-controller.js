@@ -40,6 +40,7 @@ class Component extends React.Component {
       node: { online: null, status: null, peers: null, err: null, lastOk: null, startup: null },
       wallets: [], selected: '', unlocked: {}, records: {}, metricsByWallet: {}, metrics: null, metricsErr: null, metricsAt: null, walletErr: null,
       mining: null, solves: [], activity: [], dlg: null, toast: null,
+      intensity: this.savedIntensity(), intensityBusy: false,
       send: { to: '', label: '', from: '', amount: '', subtract: false, fee: '0.01', feeCustom: '', touched: {} },
       contacts: this.loadContacts(), copiedAt: 0,
       mineErr: null, mineBusy: false, mineWallet: '', intervalStr: '10', onceStr: '1', onceBusy: false, onceMsg: null, cfg: null, showDetail: false
@@ -50,6 +51,7 @@ class Component extends React.Component {
   }
   saveContacts(list) { try { localStorage.setItem(CKEY,JSON.stringify(Object.fromEntries(list.map(x=>[x.address,x.label])))); } catch (_) {} }
   preferences() { try { return JSON.parse(localStorage.getItem(PREFS_KEY)||'{}') || {}; } catch (_) { return {}; } }
+  savedIntensity() { const n=this.preferences().miningIntensity;return [10,25,50,75,100].includes(n)?n:100; }
   savePreference(patch) { try { localStorage.setItem(PREFS_KEY,JSON.stringify({...this.preferences(),...patch})); } catch (_) {} }
   update(patch) { return new Promise(resolve=>this.setState(patch,resolve)); }
   showDialog(dlg) { this.returnFocus=document.activeElement; this.setState({dlg}); }
@@ -65,7 +67,7 @@ class Component extends React.Component {
       if (e.key === 'Escape' && this.state.dlg) { e.preventDefault(); this.closeDlg(); }
       if (this.state.dlg && e.key==='Tab') {
         const dlg=document.querySelector('[role="dialog"]');
-        const items=dlg ? [...dlg.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"]')].filter(el=>el.getClientRects().length) : [];
+        const items=dlg ? [...dlg.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),summary,[tabindex="0"]')].filter(el=>el.getClientRects().length) : [];
         if (!items.length) { e.preventDefault(); dlg?.focus(); return; }
         const index=items.indexOf(document.activeElement);
         if (e.shiftKey && index<=0) { e.preventDefault(); items.at(-1).focus(); }
@@ -229,8 +231,12 @@ class Component extends React.Component {
     this.setState({ phase: 'main' });
     try { const st = await m.startup(); if (m === this.m) this.setState(s => ({ node: { ...s.node, startup: st } })); } catch (e) { }
     try { await this.refreshWallets(this.preferences().activeWallet); } catch(e) { this.setState({walletErr:e.message}); }
-    try { const cfg = await m.config(); if (m === this.m) this.setState({ cfg }); } catch (e) { }
-    try { const st = await m.mineStatus(); if (m === this.m) this.setState({ mining: st }); } catch (e) { }
+    try { const cfg = await m.config(); if (m === this.m) this.setState({ cfg, ...(cfg.channel==='sandbox-v2'?{intensity:100}:{}) }); } catch (e) { }
+    try {
+      let st = await m.mineStatus();
+      if (!st.settings_saved && !st.mining && this.state.intensity !== (st.intensity || 100)) st = await m.mineSetIntensity(this.state.intensity);
+      if (m === this.m) this.setState({ mining: st, ...(st.mining || st.settings_saved ? {intensity:st.intensity||100} : {}) });
+    } catch (e) { }
     this.poll();
     clearInterval(this.pollT);
     this.pollT = setInterval(() => this.poll(), 2000);
@@ -419,8 +425,22 @@ class Component extends React.Component {
     } finally { this.sending = false; }
   }
 
+  async setMiningIntensity(value) {
+    const intensity=Number(value);
+    if(this.intensityAction || this.state.onceBusy || this.state.mineBusy)return;
+    if(!Number.isInteger(intensity)||intensity<10||intensity>100)return;
+    this.intensityAction=true;
+    this.setState({intensityBusy:true,mineErr:null});
+    try {
+      const st=await this.m.mineSetIntensity(intensity);
+      this.savePreference({miningIntensity:intensity});
+      this.setState({intensity,mining:st});
+    } catch(e) {this.setState({mineErr:e.message});}
+    finally {this.intensityAction=false;this.setState({intensityBusy:false});}
+  }
+
   async mineToggle() {
-    const s = this.state; if (s.mineBusy || s.onceBusy || this.miningAction) return;
+    const s = this.state; if (s.mineBusy || s.onceBusy || s.intensityBusy || this.miningAction) return;
     this.miningAction=true;
     const mining = s.mining && s.mining.mining;
     this.setState({ mineBusy: true, mineErr: null });
@@ -434,9 +454,9 @@ class Component extends React.Component {
         if (!Number.isInteger(iv) || iv < 1 || iv > 120) throw new Error('Set the interval to a whole number from 1 to 120 seconds.');
         const w = s.mineWallet;
         if(!s.node.online || !s.unlocked[w])throw new Error('Connect the node and unlock the mining wallet first.');
-        const st = await this.m.mineStart(w, iv * 1000);
+        const st = await this.m.mineStart(w, iv * 1000, s.intensity);
         this.setState({ mining: st, solves: s.mining && s.mining.wallet === w ? s.solves : [] });
-        this.log('mined', `Started continuous mining with ${w}`, `every ${iv} s`);
+        this.log('mined', `Started continuous mining with ${w}`, `${s.intensity}% intensity · every ${iv} s`);
       }
     } catch (x) { this.setState({ mineErr: x.message }); }
     finally { this.miningAction=false;this.setState({ mineBusy: false }); }
@@ -451,12 +471,12 @@ class Component extends React.Component {
 
   async mineOnce() {
     const s = this.state, n = Number(s.onceStr);
-    if(this.onceAction || this.miningAction || s.mining?.mining || !s.node.online || !s.unlocked[s.mineWallet])return;
+    if(this.onceAction || this.miningAction || s.intensityBusy || s.mining?.mining || !s.node.online || !s.unlocked[s.mineWallet])return;
     if (!Number.isInteger(n) || n < 1 || n > 100) { this.setState({ onceMsg: { err: true, text: 'Choose a whole number of blocks from 1 to 100.' } }); return; }
     this.onceAction=true;
     this.setState({ onceBusy: true, onceMsg: null });
     try {
-      const out = await this.m.mine(s.mineWallet, n);
+      const out = await this.m.mine(s.mineWallet, n, s.intensity);
       this.localBlocks += n;
       const st = await this.m.mineStatus();
       this.setState({ mining: st, onceMsg: { err: false, text: out } });
@@ -484,7 +504,7 @@ class Component extends React.Component {
     const ms = s.mining, mining = !!(ms && ms.mining), sess = ms ? ms.session : null;
     const backendLabel = b => b === 'cuda' ? 'NVIDIA CUDA' : b === 'cpu' ? 'CPU' : (b || 'Detecting…');
     const obsState = st && st.shadow ? st.shadow.state : (N.startup && N.startup.shadow ? N.startup.shadow.state : null);
-    const obs = { v: !online ? 'Unknown while node is offline' : obsState === 'active' ? 'Running' : obsState ? 'Stopped' : 'Not reported', vc: online && obsState === 'active' ? OK : SUB };
+    const obs = { v: !online ? 'Unknown while node is offline' : obsState === 'active' ? 'Running' : obsState === 'paused' ? 'Paused · low intensity' : obsState ? 'Stopped' : 'Not reported', vc: online && obsState === 'active' ? OK : SUB };
     const self = this;
 
     // splash
@@ -609,7 +629,7 @@ class Component extends React.Component {
     const rcState = noWallets || !sel ? 'none' : !selUnl ? 'locked' : 'open';
     const rc = {
       none: rcState === 'none', locked: rcState === 'locked', open: rcState === 'open' && !!rec,
-      groups: rec ? rec.address.match(/.{8}/g).map((g, i) => ({ t: g, c: i % 2 ? '#3a3c42' : INK })) : [],
+      address: rec ? rec.address : '',
       aria: rec ? 'Address ' + rec.address : '',
       copyMsg: s.copyErr ? s.copyErr : copied ? 'Full address copied to the clipboard.' : '', copyColor: s.copyErr ? ERR : OK
     };
@@ -625,11 +645,15 @@ class Component extends React.Component {
     ].map(p => ({ text: p.text, mark: p.ok ? '✓' : p.warn ? '!' : '✕', fg: p.ok ? OK : p.warn ? WARN : ERR }));
     const sessActive = sess && sess.started_at && ms.wallet === mw;
     const mc = {
+      intensity: s.intensity,
+      intensityDisabled: s.mineBusy || s.onceBusy || s.intensityBusy || s.cfg?.channel==='sandbox-v2',
+      intensityHelp: s.cfg?.channel==='sandbox-v2' ? 'Intensity control requires the v3 node runtime.' : s.intensity<=25 ? 'Smaller mining batches with short rests. Optional background research is paused; mining and block validation continue.' : 'Lower intensity uses smaller work batches with short rests. This controls work time, not peak GPU power.',
+      intensityStatus: s.intensityBusy ? 'Saving…' : mining && ms.active_intensity != null && ms.active_intensity !== s.intensity ? `${s.intensity}% saved · applies next cycle` : mining ? `${s.intensity}% · changes apply next cycle` : 'Saved on this computer',
       wallet: mw, locked: mining || s.mineBusy || s.onceBusy,
       ivBorder: ivOk ? '#d6d5cf' : ERR,
       ivHelp: !ivOk ? 'Use a whole number from 1 to 120 seconds.' : mining ? 'Wallet and interval are locked while continuous mining runs. Stop mining to change them.' : 'The interval is the pause between mining cycles on this computer. It does not change the network’s 10-second block target.',
       btnLabel: s.mineBusy ? (mining ? 'Stopping…' : 'Starting…') : mining ? 'Stop mining' : 'Start mining',
-      btnDisabled: s.mineBusy || s.onceBusy || (!mining && !canStart),
+      btnDisabled: s.mineBusy || s.onceBusy || s.intensityBusy || (!mining && !canStart),
       btnBg: mining ? '#ffffff' : INK, btnFg: mining ? INK : '#ffffff', btnBorder: mining ? INK : INK, btnDot: mining ? ERR : '#2a5cf5',
       title: mining ? `Mining continuously with ${ms.wallet}` : !online ? 'Mining needs the local node' : !mw ? 'Create a wallet to mine' : !mwUnl ? `Unlock ${mw} to mine` : 'Ready to mine',
       titleFg: mining ? '#2a5cf5' : INK,
@@ -676,7 +700,7 @@ class Component extends React.Component {
     const onceN = Number(s.onceStr), onceOk = Number.isInteger(onceN) && onceN >= 1 && onceN <= 100;
     const once = {
       disabled: mining || s.mineBusy || s.onceBusy, border: onceOk ? '#d6d5cf' : ERR,
-      btnDisabled: mining || s.mineBusy || s.onceBusy || !onceOk || !canStart,
+      btnDisabled: mining || s.mineBusy || s.onceBusy || s.intensityBusy || !onceOk || !canStart,
       label: s.onceBusy ? 'Mining…' : `Mine ${onceOk ? onceN : ''} block${onceN === 1 ? '' : 's'}`,
       help: mining ? 'Unavailable while continuous mining runs.' : 'Mines a fixed number of blocks (1–100) with the mining wallet, without starting continuous mining.',
       hasMsg: !!s.onceMsg, msg: s.onceMsg ? s.onceMsg.text : '', msgColor: s.onceMsg && s.onceMsg.err ? ERR : OK
@@ -735,10 +759,17 @@ class Component extends React.Component {
       rows.push({ k: 'Recipient receives', v: laser(D.recv) + ' LASER', w: '500' }, { k: 'Fee', v: laser(D.fee) + ' LASER', w: '400' }, { k: 'Total debit', v: laser(D.debit) + ' LASER', w: '600' });
       d = { open: true, isReview: true, kc: '#c4237f', kicker: 'Review transaction', title: `Send ${laser(D.recv)} LASER`, msg: D.subtract ? 'The fee is subtracted from the amount you entered.' : 'Check the full recipient address before signing.', rows, busy: !!D.busy, submit: D.busy ? 'Signing and submitting…' : 'Sign and send' };
     } else if (D && D.type === 'sent') {
+      const amount = amt(D.recv);
+      const amountText = amount.s + amount.i + amount.f;
+      const transactionId = D.ok ? String(D.out || '').match(/^Transaction accepted:\s*([0-9a-f]{64})\s*$/i)?.[1] : null;
       d = D.ok
-        ? { open: true, isResult: true, kc: OK, kicker: 'Accepted by local node', title: `${laser(D.recv)} LASER submitted`, msg: 'The node accepted the transaction. It is not confirmed until a miner includes it in a block; until then it shows as a pending debit.', rows: [{ k: 'To', v: short(D.to) }, { k: 'Total debit', v: laser(D.debit) + ' LASER' }], hasOut: !!D.out, out: D.out, outColor: SUB, doneLabel: 'Done', done: () => this.setState(z => ({ dlg: null, send: { ...z.send, to: '', label: '', amount: '', touched: {} } })) }
+        ? { open: true, isSuccess: true, title: 'Transaction submitted', msg: 'Waiting for network confirmation.', amount: amountText, amountSize: amountText.length > 18 ? '24px' : '36px', amountFull: amount.full, recipient: D.to,
+            rows: [{ k: 'From wallet', v: D.from }, { k: 'Fee', v: laser(D.debit - D.recv) + ' LASER' }, { k: 'Total debit', v: laser(D.debit) + ' LASER' }, ...(transactionId ? [{ k: 'Transaction ID', v: transactionId.toLowerCase() }] : [])],
+            done: () => this.setState(z => ({ dlg: null, send: { ...z.send, to: '', label: '', amount: '', touched: {} } })) }
         : { open: true, isResult: true, kc: ERR, kicker: 'Not sent', title: 'The node did not accept this transaction', msg: 'Your form is kept so you can correct it and try again.', rows: [], hasOut: true, out: D.out, outColor: ERR, doneLabel: 'Back to form', done: () => this.setState({ dlg: null }) };
     }
+    d.standardHeader = !d.isSuccess;
+    d.width = d.isSuccess ? '420px' : '460px';
 
     const desk = fixed ? { bg: '#e4e3de', pad: '32px', h: 'auto' } : { bg: '#f8f8f6', pad: '0', h: '100vh' };
     if (s.phase === 'splash' && !fixed) { desk.bg = '#e4e3de'; desk.pad = '32px'; }
@@ -779,6 +810,7 @@ class Component extends React.Component {
       mc, prereq, sessCells, lifeCells, solve, engineRows, once, mineErr: s.mineErr, intervalStr: s.intervalStr, onceStr: s.onceStr,
       onMineWallet: e => this.setState({ mineWallet: e.target.value, mineErr: null }),
       onInterval: e => this.setState({ intervalStr: e.target.value }),
+      onIntensity: e => this.setMiningIntensity(e.target.value),
       onOnce: e => this.setState({ onceStr: e.target.value, onceMsg: null }),
       mineToggle: () => this.mineToggle(), mineStop: () => this.mineStop(), mineOnce: () => this.mineOnce(),
       net, obs, peerRows, nodeRows, diagCells, cfgRows,

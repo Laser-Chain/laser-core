@@ -10,6 +10,13 @@ function blockCount(value) {
   return count;
 }
 
+function miningIntensity(value = 100) {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 10 || value > 100) {
+    throw new Error('Mining intensity must be a whole number from 10 through 100.');
+  }
+  return value;
+}
+
 function laserAddress(value) {
   const address = String(value || '').trim().toLowerCase();
   if (!/^[0-9a-f]{64}$/.test(address)) {
@@ -40,6 +47,7 @@ function laserValue(value, label, allowZero) {
 
 module.exports = {
   blockCount,
+  miningIntensity,
   laserAddress,
   laserValue,
   MAX_PROTOCOL_PHOTONS

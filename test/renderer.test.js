@@ -73,11 +73,61 @@ test('continuous and one-shot mining require explicit actions and cannot overlap
   const h=await ready();await h.app.mineToggle();assert.equal(h.calls.filter(c=>c[0]==='mineStart').length,1);
   await h.app.mineOnce();assert.ok(!h.calls.some(c=>c[0]==='mine'));
   await h.app.mineToggle();h.app.state.onceStr='101';await h.app.mineOnce();assert.match(h.app.state.onceMsg.text,/1 to 100/);
-  h.app.state.onceStr='2';await h.app.mineOnce();assert.deepEqual(h.calls.find(c=>c[0]==='mine'),['mine','Alice',2]);
+  h.app.state.onceStr='2';await h.app.mineOnce();assert.deepEqual(h.calls.find(c=>c[0]==='mine'),['mine','Alice',2,100]);
 });
 test('copy failures and unavailable metrics are visible',async()=>{
   const h=await ready({copyAddress:async()=>{throw new Error('Clipboard unavailable');}});await h.app.copyAddr();assert.match(h.app.renderVals().rc.copyMsg,/Clipboard unavailable/);
   h.laser.minerMetrics=async()=>{throw new Error('Metrics unavailable');};await h.app.refreshSelected();assert.equal(h.app.state.metrics,null);assert.equal(h.app.renderVals().bal.pendKnown,false);
+});
+
+test('intensity is saved and passed to continuous and one-shot mining',async()=>{
+  const h=await ready();await h.app.setMiningIntensity('25');
+  assert.equal(h.app.state.intensity,25);
+  assert.equal(JSON.parse(h.storage.get('laser-core.preferences.v1')).miningIntensity,25);
+  assert.ok(!h.calls.some(c=>c[0]==='mineStart'||c[0]==='mine'));
+  await h.app.mineToggle();assert.deepEqual(h.calls.find(c=>c[0]==='mineStart'),['mineStart','Alice',10000,25]);
+  assert.equal(h.app.renderVals().mc.intensityDisabled,false);
+  await h.app.setMiningIntensity('10');assert.equal(h.app.state.mining.mining,true);
+  assert.ok(!h.calls.some(c=>c[0]==='mineStop'));
+  await h.app.mineToggle();await h.app.mineOnce();assert.deepEqual(h.calls.find(c=>c[0]==='mine'),['mine','Alice',1,10]);
+  const restored=setup({},Object.fromEntries(h.storage));assert.equal(restored.app.state.intensity,10);
+});
+
+test('intensity changes report errors without saving an unapplied choice',async()=>{
+  const h=await ready({mineSetIntensity:async()=>{throw new Error('Unavailable');}});
+  await h.app.setMiningIntensity('25');assert.equal(h.app.state.intensity,100);
+  assert.equal(h.app.state.intensityBusy,false);assert.equal(h.app.state.mineErr,'Unavailable');
+  assert.equal(h.storage.has('laser-core.preferences.v1'),false);
+  assert.equal(setup({}, {'laser-core.preferences.v1':'{"miningIntensity":0}'}).app.state.intensity,100);
+});
+
+test('startup honors persisted intensity and distinguishes paused research from failure',async()=>{
+ const h=setup({mineStatus:async()=>({mining:false,intensity:10,settings_saved:true,session:{}})});
+ await h.app.openMain();assert.equal(h.app.state.intensity,10);
+ h.app.state.node={online:true,status:{shadow:{state:'paused'}}};
+ assert.equal(h.app.renderVals().obs.v,'Paused · low intensity');
+ assert.match(h.app.renderVals().mc.intensityHelp,/research is paused/);
+});
+
+test('receive displays and copies the complete address without inserted separators',async()=>{
+  const h=await ready();h.app.state.phase='main';h.app.state.view='receive';
+  const nodes=value=>Array.isArray(value)?value.flatMap(nodes):value&&typeof value==='object'?[value,...nodes(value.children||[])]:[];
+  const address=nodes(h.app.render()).find(n=>n.props?.id==='rc-address');
+  assert.equal(address.children.join(''),h.wallets.get('Alice').address);
+  await h.app.copyAddr();assert.equal(h.calls.find(c=>c[0]==='copyAddress')[1],h.wallets.get('Alice').address);
+});
+
+test('submission receipt preserves exact amounts and transaction ID without claiming confirmation',async()=>{
+  const txid='ab'.repeat(32),h=await ready({send:async()=>`Transaction accepted: ${txid}\n`});
+  h.app.setSend({to:'cd'.repeat(32),amount:'0.000000001',fee:'0.01'});h.app.renderVals().review();await h.app.confirmSend();
+  const d=h.app.renderVals().d;
+  assert(d.isSuccess);assert.equal(d.amount,'0.000000001');assert.equal(d.recipient,'cd'.repeat(32));
+  assert.equal(d.title,'Transaction submitted');assert.equal(d.msg,'Waiting for network confirmation.');
+  assert.equal(d.rows.find(r=>r.k==='Transaction ID').v,txid);
+  assert.equal(d.rows.find(r=>r.k==='Fee').v,'0.010000000 LASER');
+  assert.equal(d.rows.find(r=>r.k==='Total debit').v,'0.010000001 LASER');
+  assert.equal(d.out,undefined);
+  d.done();assert.equal(h.app.state.dlg,null);assert.equal(h.app.state.send.to,'');assert.equal(h.app.state.send.amount,'');
 });
 test('peer-query failure does not incorrectly mark an answering node offline',async()=>{
   const h=setup({peers:async()=>{throw new Error('Peers unavailable');}});await h.app.poll();assert.equal(h.app.state.node.online,true);assert.match(h.app.renderVals().net.kicker,/unavailable/);

@@ -19,6 +19,7 @@ const {
   resolveRuntime
 } = require('./runtime-config');
 const { WalletSecretStore } = require('./wallet-secret-store');
+const { loadMiningPreferences, saveMiningPreferences, researchPaused } = require('./mining-preferences');
 const {
   listWallets,
   normalizeWalletName,
@@ -31,6 +32,7 @@ const {
 } = require('./explorer-publisher');
 const {
   blockCount,
+  miningIntensity,
   laserAddress,
   laserValue,
   MAX_PROTOCOL_PHOTONS
@@ -314,7 +316,8 @@ function currentShadowState() {
     enabled,
     state: !enabled ? 'disabled' :
       (shadowProcess && !hasProcessExited(shadowProcess) ? 'active' :
-        (shadowError ? 'error' : 'stopped')),
+        (shadowError ? 'error' : researchPaused(mineIntensity) ? 'paused' : 'stopped')),
+    reason: enabled && researchPaused(mineIntensity) ? 'Paused for low-intensity mining' : null,
     protocol: enabled ? 'photonhash-shadow/1' : null,
     candidate: enabled ? 'PhotonHash v0.4.0-shadow.1 LF2-K8' : null,
     startedAt: shadowStartedAt,
@@ -324,6 +327,7 @@ function currentShadowState() {
 
 function startShadow() {
   if (runtime.channel !== 'v3' || LASER_NETWORK !== 'shadow') return true;
+  if (researchPaused(mineIntensity)) return true;
   if (shadowProcess && !hasProcessExited(shadowProcess)) return true;
   if (!LASER_SHADOW_BIN) {
     shadowError = 'Shadownet sidecar binary is unavailable.';
@@ -852,13 +856,24 @@ registerMainHandler('laser:miner-metrics', async (_event, wallet) => {
   return await queryMinerMetrics(String(wallet).trim());
 });
 
-registerMainHandler('laser:mine', async (_event, wallet, count) => {
+function miningIntensityArgs(intensity) {
+  const value = miningIntensity(intensity);
+  if (runtime.channel !== 'v3') {
+    if (value !== 100) throw new Error('Mining intensity requires the v3 node runtime.');
+    return [];
+  }
+  return ['--intensity', String(value)];
+}
+
+registerMainHandler('laser:mine', async (_event, wallet, count, intensity = 100) => {
   const name = walletName(wallet);
   const requestedCount = blockCount(count);
+  await setMiningIntensity(intensity);
   return await walletCommand([
     'node', 'mine', name, String(requestedCount),
+    ...miningIntensityArgs(intensity),
     '--rpc', LASER_RPC, '--datadir', LASER_DATADIR, '--network', LASER_NETWORK
-  ], name, 120000);
+  ], name, 120000 * 100 / miningIntensity(intensity));
 });
 
 // ── Auto-mine management ───────────────────────────────────────
@@ -866,6 +881,12 @@ registerMainHandler('laser:mine', async (_event, wallet, count) => {
 let mineTimer = null;
 let mineWallet = null;
 let mineIntervalMs = 10000;
+const miningPreferencesPath = path.join(app.getPath('userData'), 'mining-preferences.json');
+const miningPreferences = loadMiningPreferences(miningPreferencesPath);
+let mineIntensity = miningPreferences.intensity;
+let miningPreferencesSaved = miningPreferences.saved;
+let intensityUpdate = Promise.resolve();
+let mineActiveIntensity = null;
 let miningEnabled = false;
 let mineGeneration = 0;
 let mineSessionStartedAt = null;
@@ -885,6 +906,7 @@ function stopMiningForWallet(name) {
   mineTimer = null;
   mineWallet = null;
   mineNextRunAt = null;
+  mineActiveIntensity = null;
 }
 
 registerMainHandler('laser:wallet-lock', (_event, requestedName) => {
@@ -911,6 +933,10 @@ function miningStatus() {
     mining: miningEnabled,
     wallet: mineWallet,
     interval: mineIntervalMs,
+    intensity: mineIntensity,
+    settings_saved: miningPreferencesSaved,
+    research_paused: researchPaused(mineIntensity),
+    active_intensity: mineActiveIntensity,
     automatic: false,
     stoppable: true,
     backend: miningBackend,
@@ -930,11 +956,36 @@ function miningStatus() {
   };
 }
 
-registerMainHandler('laser:mine-start', async (_event, wallet, intervalMs) => {
+function setMiningIntensity(intensity) {
+  miningIntensityArgs(intensity);
+  const requested = miningIntensity(intensity);
+  intensityUpdate = intensityUpdate.catch(() => {}).then(async () => {
+    saveMiningPreferences(miningPreferencesPath, requested);
+    mineIntensity = requested;
+    miningPreferencesSaved = true;
+    if (researchPaused(requested)) {
+      if (!await stopShadow()) throw new Error('The background research process could not pause.');
+      shadowError = null;
+    } else if (nodeReady && !startShadow()) {
+      throw new Error('Mining intensity was saved, but background research could not resume.');
+    }
+  });
+  return intensityUpdate;
+}
+
+registerMainHandler('laser:mine-intensity', async (_event, intensity) => {
+  await setMiningIntensity(intensity);
+  return miningStatus();
+});
+
+registerMainHandler('laser:mine-start', async (_event, wallet, intervalMs, intensity = 100) => {
   if (!wallet || !String(wallet).trim()) {
     throw new Error('Load a wallet before auto-mining.');
   }
   const requestedWallet = walletName(wallet);
+  miningIntensityArgs(intensity);
+  if (miningEnabled) return miningStatus();
+  await setMiningIntensity(intensity);
   mineIntervalMs = Number.isInteger(intervalMs) && intervalMs >= 1000
     ? Math.min(intervalMs, 600000)
     : 10000;
@@ -961,12 +1012,14 @@ registerMainHandler('laser:mine-start', async (_event, wallet, intervalMs) => {
     if (!miningEnabled || generation !== mineGeneration) return;
     const jobWallet = mineWallet;
     const jobStartedAt = Date.now();
+    mineActiveIntensity = mineIntensity;
     mineNextRunAt = null;
     try {
       await walletCommand([
         'node', 'mine', jobWallet, '1',
+        ...miningIntensityArgs(mineActiveIntensity),
         '--rpc', LASER_RPC, '--datadir', LASER_DATADIR, '--network', LASER_NETWORK
-      ], jobWallet, 120000);
+      ], jobWallet, 120000 * 100 / mineActiveIntensity);
       if (jobWallet === mineWallet) {
         mineSessionBlocks++;
         mineSessionLastBlockAt = Date.now();
@@ -986,6 +1039,7 @@ registerMainHandler('laser:mine-start', async (_event, wallet, intervalMs) => {
         mainWindow.webContents.send('mine:error', e.message, miningStatus());
       }
     } finally {
+      if (generation === mineGeneration) mineActiveIntensity = null;
       if (miningEnabled && generation === mineGeneration) {
         mineNextRunAt = Date.now() + mineIntervalMs;
         mineTimer = setTimeout(doMine, mineIntervalMs);
@@ -1004,6 +1058,7 @@ registerMainHandler('laser:mine-stop', async () => {
   if (mineTimer) clearTimeout(mineTimer);
   mineTimer = null;
   mineNextRunAt = null;
+  mineActiveIntensity = null;
 
   if (wasMining) {
     await laserCmd([
@@ -1095,7 +1150,7 @@ app.whenReady().then(async () => {
 
   if (nodeResult.ready) {
     startShadow();
-    updateSplash('Shadownet node and PhotonHash observer ready', 100);
+    updateSplash(researchPaused(mineIntensity) ? 'Shadownet node ready · background research paused' : 'Shadownet node and PhotonHash observer ready', 100);
   }
 
   const publisherConfig = resolvePublisherConfig({

@@ -390,7 +390,7 @@
     <sc-if value="{{ rc.open }}" hint-placeholder-val="{{ true }}">
       <div style="padding:20px 20px 18px;display:grid;gap:14px">
         <div style="display:flex;align-items:center;gap:8px;font:400 10.5px 'Geist Mono',monospace;letter-spacing:0.12em;text-transform:uppercase;color:#00897d"><span style="width:6px;height:6px;background:#00897d;display:block"></span>{{ selected }} · receiving address</div>
-        <div id="rc-address" aria-label="{{ rc.aria }}" style="padding:16px 18px;border:1px solid #e6e5e0;background:#f8f8f6;border-radius:3px;font:500 clamp(14px,2.1vw,19px)/1.6 'Geist Mono',monospace;letter-spacing:0.02em;user-select:all;overflow-wrap:anywhere"><sc-for list="{{ rc.groups }}" as="g" hint-placeholder-count="8"><span style="margin-right:0.6em;color:{{ g.c }}">{{ g.t }}</span></sc-for></div>
+        <div id="rc-address" aria-label="{{ rc.aria }}" class="receive-address">{{ rc.address }}</div>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <button onClick="{{ copyAddr }}" style="height:36px;padding:0 16px;border:1px solid #0e0f12;background:#0e0f12;color:#ffffff;border-radius:3px;font:500 11px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer" style-hover="background:#2b2d33">{{ copyLabel }}</button>
           <span role="status" aria-live="polite" style="font-size:12.5px;color:{{ rc.copyColor }}">{{ rc.copyMsg }}</span>
@@ -433,6 +433,22 @@
         </div>
       </div>
       <button onClick="{{ mineToggle }}" disabled="{{ mc.btnDisabled }}" style="margin-left:auto;height:40px;min-width:150px;padding:0 18px;border:1px solid {{ mc.btnBorder }};background:{{ mc.btnBg }};color:{{ mc.btnFg }};border-radius:3px;font:500 11.5px 'Geist Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px"><span style="width:7px;height:7px;background:{{ mc.btnDot }};display:block"></span>{{ mc.btnLabel }}</button>
+    </div>
+    <div class="mining-intensity">
+      <div class="mining-intensity-control">
+        <label for="mine-intensity">Mining intensity</label>
+        <select id="mine-intensity" value="{{ mc.intensity }}" onChange="{{ onIntensity }}" disabled="{{ mc.intensityDisabled }}" aria-describedby="mine-intensity-help">
+          <option value="10">Minimal · 10%</option>
+          <option value="25">Quiet · 25%</option>
+          <option value="50">Balanced · 50%</option>
+          <option value="75">High · 75%</option>
+          <option value="100">Full · 100%</option>
+        </select>
+      </div>
+      <div class="mining-intensity-copy">
+        <p id="mine-intensity-help">{{ mc.intensityHelp }}</p>
+        <span role="status">{{ mc.intensityStatus }}</span>
+      </div>
     </div>
     <div style="padding:14px 18px;display:grid;gap:10px">
       <div style="display:flex;align-items:baseline;gap:8px 14px;flex-wrap:wrap">
@@ -624,12 +640,29 @@
 
   <sc-if value="{{ d.open }}" hint-placeholder-val="{{ false }}">
     <div onMouseDown="{{ backdrop }}" style="position:absolute;inset:0;z-index:40;background:rgba(14,15,18,0.34);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto">
-      <div role="dialog" tabIndex="-1" aria-modal="true" aria-labelledby="dlg-title" onMouseDown="{{ stopProp }}" style="width:460px;max-width:100%;max-height:100%;overflow:auto;background:#fbfbf9;border:1px solid #d6d5cf;border-radius:6px;box-shadow:0 24px 60px rgba(14,15,18,0.2)">
+      <div role="dialog" tabIndex="-1" aria-modal="true" aria-labelledby="dlg-title" onMouseDown="{{ stopProp }}" style="width:{{ d.width }};max-width:100%;max-height:100%;overflow:auto;background:#fbfbf9;border:1px solid #d6d5cf;border-radius:6px;box-shadow:0 24px 60px rgba(14,15,18,0.2)">
+        <sc-if value="{{ d.standardHeader }}">
         <div style="padding:16px 18px 14px;border-bottom:1px solid #e6e5e0">
           <div style="display:flex;align-items:center;gap:8px;font:500 10.5px 'Geist Mono',monospace;letter-spacing:0.12em;text-transform:uppercase;color:{{ d.kc }}"><span style="width:6px;height:6px;background:{{ d.kc }};display:block"></span>{{ d.kicker }}</div>
           <h2 id="dlg-title" style="margin:7px 0 0;font:500 18px/1.25 'Geist',sans-serif;letter-spacing:-0.02em;overflow-wrap:anywhere">{{ d.title }}</h2>
           <p style="margin:6px 0 0;font-size:13px;line-height:1.5;color:#62646b;text-wrap:pretty">{{ d.msg }}</p>
         </div>
+        </sc-if>
+
+        <sc-if value="{{ d.isSuccess }}">
+          <div class="transaction-success">
+            <div class="transaction-success-mark" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M5 12.5L9.5 17L19 7" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"></path></svg></div>
+            <h2 id="dlg-title">{{ d.title }}</h2>
+            <p class="transaction-success-status">{{ d.msg }}</p>
+            <div class="transaction-success-amount" title="{{ d.amountFull }}" style="font-size:{{ d.amountSize }}">{{ d.amount }}<span>LASER</span></div>
+            <div class="transaction-success-recipient"><span>To</span><code>{{ d.recipient }}</code></div>
+            <details class="transaction-success-details">
+              <summary>Transaction details</summary>
+              <dl><sc-for list="{{ d.rows }}" as="r"><div><dt>{{ r.k }}</dt><dd>{{ r.v }}</dd></div></sc-for></dl>
+            </details>
+            <button class="transaction-success-done" autoFocus="{{ true }}" onClick="{{ d.done }}">Done</button>
+          </div>
+        </sc-if>
 
         <sc-if value="{{ d.isName }}" hint-placeholder-val="{{ false }}">
           <form onSubmit="{{ nameSubmit }}" style="padding:16px 18px;display:grid;gap:7px">

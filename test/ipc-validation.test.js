@@ -3,10 +3,19 @@ const test = require('node:test');
 
 const {
   blockCount,
+  miningIntensity,
   laserAddress,
   laserValue,
   MAX_PROTOCOL_PHOTONS
 } = require('../ipc-validation');
+
+test('mining intensity accepts only bounded integer percentages', () => {
+  for (const value of [10, 25, 50, 75, 100]) assert.equal(miningIntensity(value), value);
+  assert.equal(miningIntensity(), 100);
+  for (const value of [null, true, '25', 0, 9, 101, 25.5, NaN, Infinity, '--rpc']) {
+    assert.throws(() => miningIntensity(value));
+  }
+});
 
 test('block counts are bounded integers', () => {
   assert.equal(blockCount(1), 1);
