@@ -24,4 +24,4 @@ Bundled components retain their own terms:
   the source repository.
 
 Source and security policy:
-https://github.com/photonicmoney/laser-core
+https://github.com/Laser-Chain/laser-core

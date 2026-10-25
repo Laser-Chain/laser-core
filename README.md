@@ -21,7 +21,7 @@ wallets, and mines to the wallet you select.
 
 ### 1. Download and verify
 
-1. Open the [Laser Core 0.2.0-beta.2 release](https://github.com/photonicmoney/laser-core/releases/tag/v0.2.0-beta.2).
+1. Open the [Laser Core 0.2.0-beta.2 release](https://github.com/Laser-Chain/laser-core/releases/tag/v0.2.0-beta.2).
 2. Download `Laser-Core-0.2.0-beta.2-portable-x64.exe` and `SHA256SUMS`.
 3. In PowerShell, calculate the executable hash:
 
