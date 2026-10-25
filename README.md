@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="renderer/logo.png" alt="Laser chain logo" width="220">
+  <img src="docs/assets/laserchain-light.png" alt="Laser chain logo" width="220">
 </p>
 
 <h1 align="center">Laser Core</h1>
