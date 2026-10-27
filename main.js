@@ -1170,6 +1170,7 @@ app.whenReady().then(async () => {
     resourcesPath: process.resourcesPath,
     datadir: LASER_DATADIR,
     network: LASER_NETWORK,
+    rpc: LASER_RPC,
     safeStorage
   });
   explorerPublisher.initialize(nodeResult.ready);

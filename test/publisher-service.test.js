@@ -126,7 +126,8 @@ test('unavailable encryption fails without writing plaintext and tokens cannot m
 });
 
 function publisher(t, callbacks) {
-  const p = new ExplorerPublisher({ url, token, intervalMs: 3000 }, 'fixture-chain', 'shadow', callbacks);
+  const p = new ExplorerPublisher({ url, token, intervalMs: 3000 }, 'fixture-chain', 'shadow', {
+    status: async () => ({height: 4, tip: 'hash-4'}), heartbeat: async () => {}, ...callbacks });
   p.schedule = delay => { p.scheduled = delay; };
   p.start(); t.after(() => p.stop()); return p;
 }
@@ -146,7 +147,7 @@ test('publisher retries failed uploads, reports delivery separately, and avoids 
 test('stopping during an export aborts work and prevents a late upload', async t => {
   let finish, signal, sends = 0;
   const p = publisher(t, { build: (_c, _d, _n, _r, s) => { signal = s; return new Promise(resolve => { finish = resolve; }); }, send: async () => sends++ });
-  const pending = p.tick(); p.stop(); finish(snapshot); await pending;
+  const pending = p.tick(); await new Promise(resolve => setImmediate(resolve)); p.stop(); finish(snapshot); await pending;
   assert.equal(signal.aborted, true); assert.equal(sends, 0); assert.equal(p.status.state, 'stopped');
 });
 

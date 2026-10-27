@@ -752,10 +752,10 @@ class Component extends React.Component {
     const pub = s.publisher || { state: 'starting' };
     const publisherLabels = { starting: 'Starting', unconfigured: 'Not configured', 'waiting-node': 'Waiting for local node',
       waiting: 'Starting publisher', exporting: 'Exporting chain snapshot', uploading: 'Uploading snapshot', current: 'Snapshot delivered',
-      error: 'Publishing failed', stopped: 'Stopped', unavailable: 'Status unavailable' };
+      delegated: 'Managed by server', error: 'Publishing failed', stopped: 'Stopped', unavailable: 'Status unavailable' };
     const publisher = {
       label: publisherLabels[pub.state] || 'Unknown', enabled: pub.enabled, url: pub.url || 'No endpoint configured',
-      detail: pub.lastPublishedAt ? `Last delivered #${grp(pub.lastHeight)} · ${ago(s.now - pub.lastPublishedAt)}` : 'No snapshot delivered in this session',
+      detail: pub.state === 'delegated' ? 'The explorer receives data from its server node. Desktop publishing is idle.' : pub.lastPublishedAt ? `Last delivered #${grp(pub.lastHeight)} · ${ago(s.now - pub.lastPublishedAt)}` : 'No snapshot delivered in this session',
       error: s.publisherError || pub.error, hasError: !!(s.publisherError || pub.error),
       editing: !!s.publisherDraft, busy: s.publisherBusy, draft: s.publisherDraft || {},
       tokenHelp: pub.enabled ? 'Leave blank to keep the saved token for this endpoint.' : 'Use a token issued by your explorer operator.',

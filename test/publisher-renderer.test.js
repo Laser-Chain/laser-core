@@ -37,3 +37,12 @@ test('publisher settings menu opens the network setup and cancellation clears th
   assert.equal(h.app.state.publisherDraft, null);
   h.app.cleanup(); assert.equal(h.listeners.publisher, undefined);
 });
+
+test('server authority is shown as a completed handover rather than an upload error', async () => {
+  const h = setup({ publisherStatus: async () => ({state:'delegated',enabled:true}) });
+  await h.app.poll();
+  const view = h.app.renderVals();
+  assert.equal(view.publisher.label, 'Managed by server');
+  assert.equal(view.publisher.hasError, false);
+  assert.match(view.publisher.detail, /server node/);
+});

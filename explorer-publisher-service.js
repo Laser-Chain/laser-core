@@ -50,7 +50,7 @@ class PublisherService {
       return;
     }
     if (!this.nodeReady) { this.state.state = 'waiting-node'; return; }
-    const publisher = this.makePublisher({ ...this.config, lxe }, this.options.datadir, this.options.network, {
+    const publisher = this.makePublisher({ ...this.config, lxe, rpc: this.options.rpc || '127.0.0.1:19544' }, this.options.datadir, this.options.network, {
       onStatus: state => { if (this.publisher === publisher) this.state = state; }
     });
     this.publisher = publisher;

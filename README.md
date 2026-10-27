@@ -260,7 +260,12 @@ after checking the saved setup. `LXE_BIN` remains a development helper override;
 source launches otherwise use `.runtime/explorer/lxe.exe`. The upload interval
 defaults to 3 seconds **after** export/upload completes (legacy `interval_ms` or
 `LASER_EXPLORER_INTERVAL_MS`, clamped to 3–600 seconds). Unchanged successfully
-delivered tips are not uploaded again. Settings are bound to the selected network.
+delivered tips are not exported or uploaded again: the publisher first reads the
+node's scoped, loopback STATUS endpoint. Independent thirty-second heartbeats
+confirm the same indexed tip without claiming that a new block was mined.
+If the explorer reports an authoritative server index, desktop publishing stops
+and displays **Managed by server**. Node, wallet and mining operation remain
+independent. Settings are bound to the selected network.
 
 All electron-builder targets, including `dist:win`, `dist:redesign` and the
 release workflow, run shared before/after packaging checks. They reject missing,
