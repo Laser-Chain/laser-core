@@ -8,6 +8,32 @@ test('startup lists encrypted wallets without opening or mining them',async()=>{
   assert.equal(app.state.selected,'Alice');assert.equal(app.state.unlocked.Alice,false);
   assert.equal(calls.length,0);
 });
+test('slow saved-chain startup connects on a later poll without unlocking or mining',async()=>{
+  let online=false;
+  const h=setup({
+    startup:async()=>({running:true,ready:online,startedAt:Date.now()-360000,error:null}),
+    status:async()=>{if(!online)throw new Error('RPC unavailable');return {height:44467};}
+  });
+  await h.app.poll();
+  assert.equal(h.app.renderVals().banner.label,'Node starting');
+  assert.doesNotMatch(h.app.renderVals().banner.text,/restart|Close other Laser/);
+  online=true;await h.app.poll();
+  assert.equal(h.app.state.node.online,true);
+  assert.equal(h.app.state.node.startup.ready,true);
+  assert.equal(h.app.renderVals().banner.show,false);
+  assert.ok(!h.calls.some(c=>c[0]==='walletOpen'||c[0]==='mineStart'));
+});
+
+test('a child failure after the splash remains visible on the next poll',async()=>{
+  let failed=false;
+  const h=setup({status:async()=>{throw new Error('RPC unavailable');},
+    startup:async()=>({running:!failed,ready:false,error:failed?'Node exited: fixture':null})});
+  await h.app.poll();assert.equal(h.app.renderVals().banner.label,'Node starting');
+  failed=true;await h.app.poll();
+  assert.equal(h.app.renderVals().banner.label,'Node failed to start');
+  assert.equal(h.app.renderVals().banner.text,'Node exited: fixture');
+});
+
 test('new design renders all five views with unavailable and exact monetary values',async()=>{
   const {app}=await ready();
   for(const view of ['overview','send','receive','mining','network']){app.state.view=view;assert.ok(app.render());}

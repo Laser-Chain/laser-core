@@ -1,6 +1,16 @@
 # Laser Core release notes
 
-## Unreleased
+## 0.2.0-beta.3: startup recovery and desktop operations (2026-10-28)
+
+- Keep the node marked as starting while it verifies saved blocks, even when
+  verification takes longer than five minutes. Open the interface after a short
+  splash, show elapsed time, and connect automatically when RPC becomes ready.
+- Initialize optional services on late readiness, preserve publisher recovery,
+  and report actual process failures without prompting an unnecessary restart.
+- Keep native node and CLI console windows hidden during normal operation.
+
+- Idle the optional explorer publisher while the chain tip is unchanged and
+  respect server source authority. Publishing remains independent of mining.
 
 - Every supported Windows x64 package must include the publisher service,
   snapshot helper and helper SHA-256 identity. All packaging paths validate
@@ -26,10 +36,12 @@
   display the network as Shadownet (testnet), and group runtime, protocol,
   storage, and connection settings under technical details.
 
-These changes are on `main`; the existing `v0.2.0-beta.2` download is unchanged.
-Builds with mining intensity require the matching Laser node update that
-supports `--intensity` and the optional intensity field in the `MINE` RPC.
-Rebuild and stage that runtime before packaging the desktop app.
+The Windows x64 beta.3 package includes these changes and the matching native
+runtime with mining-intensity support. The node engine remains 3.0.0-beta.2;
+active Shadownet consensus remains PhotonHash v0.2.2. This is an unsigned
+prerelease for the experimental, valueless Shadownet. Previous downloads remain
+available. Build identity, runtime hashes and dependency inventory accompany
+the executable.
 
 ## 0.2.0-beta.2: desktop redesign (2026-10-21)
 

@@ -21,8 +21,8 @@ wallets, and mines to the wallet you select.
 
 ### 1. Download and verify
 
-1. Open the [Laser Core 0.2.0-beta.2 release](https://github.com/Laser-Chain/laser-core/releases/tag/v0.2.0-beta.2).
-2. Download `Laser-Core-0.2.0-beta.2-portable-x64.exe` and `SHA256SUMS`.
+1. Open the [Laser Core 0.2.0-beta.3 release](https://github.com/Laser-Chain/laser-core/releases/tag/v0.2.0-beta.3).
+2. Download `Laser-Core-0.2.0-beta.3-portable-x64.exe` and `SHA256SUMS`.
 3. In PowerShell, calculate the executable hash:
 
 ```powershell
@@ -41,8 +41,12 @@ Open the portable executable. Laser Core will:
 - start the bundled `laserd` full node;
 - connect to the Laser Shadownet bootstrap peer;
 - validate and store the chain locally;
-- start the non-consensus PhotonHash observer; and
-- open the wallet and mining interface when RPC is ready.
+- start the non-consensus PhotonHash observer when enabled by your intensity setting; and
+- open the interface while the node finishes startup, then connect automatically.
+
+Saved-chain verification can take several minutes. The **Node starting** banner
+shows elapsed time; keep the app open while verification completes. A slow
+startup is not treated as a failure merely because five minutes have passed.
 
 The status bar shows peer count and chain height. Leave Laser Core running to
 remain connected and continue validating Shadownet.
@@ -66,8 +70,8 @@ passphrase private. Use **Restore** to import an encrypted wallet backup.
 
 ### 4. Mine on Shadownet
 
-The intensity controls described here are on `main`; the current tagged
-`v0.2.0-beta.2` download predates them. See [release notes](RELEASE_NOTES.md).
+The `v0.2.0-beta.3` download includes intensity controls and the matching native
+runtime. See [release notes](RELEASE_NOTES.md).
 
 1. Wait until the node is online and has at least one peer.
 2. Create or open your wallet.
@@ -152,8 +156,10 @@ an inbound-reachable public node requires an appropriate `LASER_LISTEN`,
 
 - **No peers:** confirm the computer is online and that firewall or endpoint
   security is not blocking Laser Core.
-- **Node stays offline:** close other Laser processes, restart the client, and
-  read the startup error shown in the application.
+- **Node starting:** keep the client open while it verifies saved blocks. The
+  interface connects automatically; restarting repeats verification.
+- **Node failed to start:** read the diagnostic shown in the application.
+  If it reports a data-directory lock, close the other node using that directory.
 - **Wallet will not open:** confirm the wallet name, backup file, and
   passphrase. Passphrases cannot be reset.
 - **Mining stops:** reopen/unlock the wallet, check the node is online, and

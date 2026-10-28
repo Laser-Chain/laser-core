@@ -13,6 +13,7 @@ const { execFile, execFileSync, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { parseExactJSON } = require('./exact-json');
+const { waitForRpc } = require('./node-startup');
 const { pathToFileURL } = require('url');
 const {
   buildNodeArgs,
@@ -150,6 +151,8 @@ let shadowError = null;
 let shadowStartedAt = null;
 let nodeStderr = [];
 let nodeReady = false;
+let nodeStartedAt = null;
+let nodeServicesStarted = false;
 let activeNodeVersion = null;
 let explorerPublisher = null;
 let miningBackend = 'cpu';
@@ -272,8 +275,10 @@ function startNode() {
 
   laserdProcess = spawn(LASERD_BIN, args, {
     cwd: LASER_CWD,
+    windowsHide: true,
     stdio: ['ignore', 'pipe', 'pipe']
   });
+  nodeStartedAt = Date.now();
 
   laserdProcess.stdout.on('data', (data) => {
     console.log('[laserd]', data.toString().trim());
@@ -288,13 +293,14 @@ function startNode() {
     }
   });
 
-  laserdProcess.on('exit', (code) => {
+  laserdProcess.on('exit', (code, signal) => {
     console.log('[laser-core] Node exited with code', code);
-    if (!nodeReady && code !== 0) {
+    if (!shutdownPromise) {
       nodeStartupError = nodeStderr.join('\n') ||
-        `Node exited before RPC became ready (code ${code}).`;
+        `Node exited${nodeReady ? '' : ' before RPC became ready'} (${signal || `code ${code}`}).`;
       updateSplash('Node failed: ' + nodeStartupError, 100);
     }
+    nodeReady = false;
     laserdProcess = null;
     explorerPublisher?.setNodeReady(false);
     if (shadowProcess && !hasProcessExited(shadowProcess)) shadowProcess.kill();
@@ -576,7 +582,7 @@ function showAbout() {
 
 function laserCmd(args, timeout = 15000) {
   return new Promise((resolve, reject) => {
-    execFile(LASER_BIN, args, { timeout, cwd: LASER_CWD }, (err, stdout, stderr) => {
+    execFile(LASER_BIN, args, { timeout, cwd: LASER_CWD, windowsHide: true }, (err, stdout, stderr) => {
       if (err) reject(new Error(stderr || stdout || err.message));
       else resolve(stdout.trim());
     });
@@ -671,47 +677,55 @@ function updateSplash(text, progress) {
   splashWindow.webContents.send('splash:status', { text, progress });
 }
 
-async function waitForNodeReady(timeoutMs = 300000) {
-  const startedAt = Date.now();
-  let attempt = 0;
-  let lastRpcError = '';
+function markNodeReady(status) {
+  if (shutdownPromise || !laserdProcess || hasProcessExited(laserdProcess)) return;
+  updateMiningBackend(status);
+  nodeReady = true;
+  nodeStartupError = null;
+  if (!nodeServicesStarted) {
+    nodeServicesStarted = true;
+    startShadow();
+  }
+  try {
+    explorerPublisher?.setNodeReady(true);
+  } catch (error) {
+    console.error('[laser-core] Optional explorer publisher failed:', error.message);
+  }
+}
 
-  while (Date.now() - startedAt < timeoutMs) {
-    if (nodeStartupError) {
-      updateSplash('Node failed: ' + nodeStartupError, 100);
-      return { ready: false, status: null, error: nodeStartupError };
-    }
-    attempt++;
-    updateSplash(
-      attempt < 3 ? 'Starting node...' : 'Waiting for RPC interface...',
+async function waitForNodeReady() {
+  const result = await waitForRpc({
+    isRunning: () => Boolean(laserdProcess && !hasProcessExited(laserdProcess)),
+    getError: () => nodeStartupError,
+    onAttempt: attempt => updateSplash(
+      attempt < 3 ? 'Starting node...' : 'Loading and verifying saved blocks...',
       Math.min(85, 18 + attempt * 6)
-    );
-
-    try {
+    ),
+    probe: async () => {
       const raw = await laserCmd([
         'node', 'status', '--rpc', LASER_RPC,
         '--datadir', LASER_DATADIR, '--network', LASER_NETWORK, '--json'
       ], 1800);
-      const status = parseExactJSON(raw);
-      updateMiningBackend(status);
-      nodeReady = true;
-      updateSplash('Node ready at height ' + status.height, 100);
-      return { ready: true, status };
-    } catch (error) {
-      lastRpcError = error.message;
-      await new Promise(resolve => setTimeout(resolve, 450));
+      return parseExactJSON(raw);
     }
+  });
+  if (result.ready) {
+    markNodeReady(result.status);
+    updateSplash('Node ready at height ' + result.status.height, 100);
+  } else if (result.pending) {
+    updateSplash('Node is still starting. Opening Laser Core...', 85);
+  } else {
+    nodeStartupError = result.error;
+    updateSplash('Node failed: ' + nodeStartupError, 100);
   }
-
-  nodeStartupError = nodeStartupError ||
-    `RPC did not become ready: ${lastRpcError || 'startup timed out'}`;
-  updateSplash('Node unavailable: ' + nodeStartupError, 100);
-  return { ready: false, status: null, error: nodeStartupError };
+  return result;
 }
 
 registerMainHandler('laser:startup', () => ({
   appVersion: app.getVersion(),
   ready: nodeReady,
+  running: Boolean(laserdProcess && !hasProcessExited(laserdProcess)),
+  startedAt: nodeStartedAt,
   error: nodeStartupError,
   stderr: nodeStderr,
   channel: runtime.channel,
@@ -736,8 +750,7 @@ registerMainHandler('laser:status', async () => {
       '--datadir', LASER_DATADIR, '--network', LASER_NETWORK, '--json'
     ]);
     const status = parseExactJSON(raw);
-    updateMiningBackend(status);
-    explorerPublisher?.setNodeReady(true);
+    markNodeReady(status);
     return { ...status, shadow: currentShadowState() };
   } catch (error) {
     explorerPublisher?.setNodeReady(false);
@@ -1157,12 +1170,7 @@ app.whenReady().then(async () => {
   startNode();
 
   const minimumSplash = new Promise(resolve => setTimeout(resolve, 1100));
-  const [nodeResult] = await Promise.all([waitForNodeReady(), minimumSplash]);
-
-  if (nodeResult.ready) {
-    startShadow();
-    updateSplash(researchPaused(mineIntensity) ? 'Shadownet node ready · background research paused' : 'Shadownet node and PhotonHash observer ready', 100);
-  }
+  await Promise.all([waitForNodeReady(), minimumSplash]);
 
   explorerPublisher = new PublisherService({
     appDir: __dirname,
@@ -1173,7 +1181,7 @@ app.whenReady().then(async () => {
     rpc: LASER_RPC,
     safeStorage
   });
-  explorerPublisher.initialize(nodeResult.ready);
+  explorerPublisher.initialize(nodeReady);
 
   createWindow();
   mainWindow.once('ready-to-show', () => {

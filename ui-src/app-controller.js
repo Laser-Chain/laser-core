@@ -265,11 +265,14 @@ class Component extends React.Component {
       const results=await Promise.allSettled([m.status(),m.peers()]);
       if(results[0].status==='fulfilled') status=results[0].value; else err=results[0].reason.message;
       if(results[1].status==='fulfilled') peers=results[1].value;
+      let startup = null;
+      try { startup = await m.startup(); } catch (_) { }
       try { await this.refreshWallets(); } catch(e) { this.setState({walletErr:e.message}); }
       if (m !== this.m || this.destroyed) return;
       const local = this.localBlocks; this.localBlocks = 0;
       this.setState(s => {
         const node = { ...s.node }; const act = s.activity.slice();
+        if (startup) node.startup = startup;
         if (status) {
           if (node.online === false && node.lastOk) act.unshift(this.ev('ok', 'Reconnected to the local node'));
           const prev = node.status ? node.status.height : null;
@@ -566,7 +569,9 @@ class Component extends React.Component {
     // banner
     let banner = { show: false };
     const se = N.startup && N.startup.error;
-    if (offline && se && !N.lastOk) banner = { show: true, bg: '#fbeef0', border: '#efc6cf', fg: ERR, label: 'Node failed to start', text: se + ' Close other Laser processes, then restart Laser Core.', hasDetail: !!(N.startup.stderr || N.err), detail: [N.startup.stderr, N.err].filter(Boolean).join('\n') };
+    const starting = offline && !N.lastOk && N.startup && N.startup.running && !se;
+    if (starting) banner = { show: true, bg: '#fbf3e6', border: '#ecd4b0', fg: WARN, label: 'Node starting', text: 'The node is loading and verifying your saved chain. This can take several minutes. Keep Laser Core open; it will connect automatically when ready.' + (N.startup.startedAt ? ` Elapsed: ${hms(s.now - N.startup.startedAt)}.` : ''), hasDetail: false };
+    else if (offline && se && !N.lastOk) banner = { show: true, bg: '#fbeef0', border: '#efc6cf', fg: ERR, label: 'Node failed to start', text: se, hasDetail: !!(N.startup.stderr?.length || N.err), detail: [Array.isArray(N.startup.stderr) ? N.startup.stderr.join('\n') : N.startup.stderr, N.err].filter(Boolean).join('\n') };
     else if (offline) banner = { show: true, bg: '#fbeef0', border: '#efc6cf', fg: ERR, label: stale ? 'Reconnecting' : 'Node offline', text: stale ? `The local node stopped answering. Grey values were last updated at ${clock(N.lastOk)}. Retrying every 2 s.` : 'Waiting for the local RPC interface. Wallet balances and mining need the node.', hasDetail: !!N.err, detail: N.err || '' };
     else if (online && pe && pe.peers === 0) banner = { show: true, bg: '#fbf3e6', border: '#ecd4b0', fg: WARN, label: 'No peers', text: `The local node is running but not connected to other Shadownet nodes${pe.connecting ? ` · ${pe.connecting} connection attempts in progress` : ''}.`, hasDetail: false };
     else if (N.online === null && s.phase === 'main') banner = { show: true, bg: '#f4f4f1', border: '#e6e5e0', fg: SUB, label: 'Connecting', text: 'Contacting the local node…', hasDetail: false };
