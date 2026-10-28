@@ -48,6 +48,12 @@ Saved-chain verification can take several minutes. The **Node starting** banner
 shows elapsed time; keep the app open while verification completes. A slow
 startup is not treated as a failure merely because five minutes have passed.
 
+Development builds with the updated validated-state runtime perform that full
+replay once, then reuse locally verified state on subsequent launches. New
+blocks are always validated. A missing or damaged cache triggers a full rebuild.
+This optimization is not included in the published beta.3 download; see the
+[unreleased notes](RELEASE_NOTES.md#unreleased-validated-state-startup-cache).
+
 The status bar shows peer count and chain height. Leave Laser Core running to
 remain connected and continue validating Shadownet.
 

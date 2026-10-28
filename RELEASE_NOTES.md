@@ -1,5 +1,22 @@
 # Laser Core release notes
 
+## Unreleased: validated-state startup cache
+
+- Resume the native daemon from locally validated account state and rebuild
+  its header index without repeating historical proof-of-work verification.
+  The first run after upgrading still validates the full saved chain once.
+- Bind cached state to the exact saved block prefix, network, validation rules,
+  active tip and state root. Missing or invalid caches trigger full replay.
+- Validate all newer blocks normally, preserve unrestricted fork recovery,
+  and save state every 64 accepted records and on orderly shutdown.
+- Report cached/replayed startup counts in native status. Native `--reindex`
+  forces a complete rebuild. Core's existing startup banner stays available
+  while first-run validation completes.
+
+This requires the matching updated native runtime. The published beta.3
+download predates this change. Consensus, wallets and block-store format are
+unchanged; cache files are local acceleration data, not network checkpoints.
+
 ## 0.2.0-beta.3: startup recovery and desktop operations (2026-10-28)
 
 - Keep the node marked as starting while it verifies saved blocks, even when
