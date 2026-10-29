@@ -56,11 +56,14 @@ No updater, telemetry or crash upload is enabled by this feature.
 Local Windows checks cover native unit/negative tests and disposable fake-proxy
 nodes, including discovery, sync, block relay, proxy down/refusal/malformed
 replies, timeout, restart and onion-only filtering. The desktop source matrix
-passes on Windows, Linux and macOS. Native Linux/macOS jobs are configured, but
-have not run successfully; their verification remains pending. Fake proxies do not
-prove real Tor circuit isolation, and mock onion names do not prove real onion
-interoperability. **Real-Tor interoperability, DNS/IPv4/IPv6 packet capture,
-deny-all-except-proxy firewall tests across every app/helper process, and
+passes on Windows, Linux and macOS. A bounded Linux lab with maintained real Tor
+now covers actual onion sync/relay/discovery, stream isolation, HTTPS exits,
+IPv6 proxy/destination paths, desktop guards, Tor down/restart and packet/firewall
+observation. See the [dated verification record](tor-verification.md), including
+the browser's classified, packet-free IPv6 route lookup and the stronger socket-call
+gate that remains unmet. Native hosted Linux/macOS jobs are still unverified.
+**Windows/macOS real-Tor egress, normal production sandboxing, routed host IPv6,
+controlled clearnet Laser peers, the remaining helper/lifecycle paths and
 independent review remain binary-release gates.** The mode stays experimental.
 
 Mining rewards, accounts, amounts and transaction relationships are public chain
