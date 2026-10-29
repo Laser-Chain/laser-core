@@ -2,6 +2,12 @@
 
 Audit date: 2026-07-27
 
+Maintenance note, 2026-10-28: the historical dependency counts below describe
+that audit's inputs. The current lockfile updates Electron to 43.8.4 and patches
+compatible transitive dependencies; a fresh full `npm audit` reports zero known
+advisories. This is a dated dependency check, not a new independent security
+audit or an update to existing release binaries. CI now repeats the full audit.
+
 ## Result
 
 No credentials, private keys, bearer tokens, local user paths, or private
