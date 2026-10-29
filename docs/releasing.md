@@ -4,6 +4,12 @@ Release evidence belongs to an exact commit and exact artifact bytes. Changes
 on `main` do not update an existing downloadable executable. Desktop versions
 and native node versions are separate identities.
 
+The experimental Tor source must not be advertised as available in beta.4
+downloads. Before issuing a binary with this option, satisfy the remaining
+real-Tor, process-wide egress and independent-review gates in
+[privacy.md](privacy.md), and verify that an incompatible native runtime stops
+startup. Source unit tests and fake proxies are not anonymous-operation proof.
+
 ## Prepare a candidate
 
 1. Select a clean desktop commit with passing source CI. Run `npm ci`, rebuild

@@ -1,5 +1,16 @@
 # Laser Core release notes
 
+## Unreleased
+
+- Add experimental, opt-in Tor routing configuration for compatible v3 runtimes,
+  with no P2P listener, no public address advertisement and no direct fallback.
+  Use a separate default chain directory and local RPC port for Tor mode.
+- Keep explorer publishing off before credentials are loaded in Tor mode; block
+  browser network requests and reject runtimes without proxy support.
+- Add configuration, startup and privacy regression checks. Real-Tor and
+  system-wide egress qualification remain required before a binary release.
+  Existing beta.4 downloads and installed nodes are unchanged.
+
 ## 0.2.0-beta.4: wallet recovery, validated startup and traceable builds (2026-10-28)
 
 - Compile all seven native executables from isolated, committed source snapshots.

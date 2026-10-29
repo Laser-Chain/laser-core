@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { privacyConfig } = require('./privacy');
 
 const SANDBOX_V2_COMMIT = 'c651572d5061e2e382a036ed538b305b70d6cb42';
 const SANDBOX_V2_PEER = '203.0.113.10:19444';
@@ -18,12 +19,17 @@ function parsePeers(value) {
 }
 
 function buildNodeArgs(runtime) {
+  if (runtime.error) throw new Error(runtime.error);
   const args = [
     '--network', runtime.network,
     '--datadir', runtime.dataDir,
     '--listen', runtime.listen,
     '--rpc-listen', runtime.rpc
   ];
+  if (runtime.privacy?.enabled) {
+    args.push('--proxy', runtime.privacy.proxy);
+    if (runtime.privacy.onionOnly) args.push('--onion-only');
+  }
   if (runtime.advertise) args.push('--advertise', runtime.advertise);
   for (const peer of runtime.peers) args.push('--peer', peer);
   return args;
@@ -144,6 +150,7 @@ function resolveRuntime(options = {}) {
   const appDir = path.resolve(options.appDir || __dirname);
   const resourcesPath = options.resourcesPath && path.resolve(options.resourcesPath);
   const env = options.env || process.env;
+  const privacy = privacyConfig(env);
   const platform = options.platform || process.platform;
   const exists = options.exists || fs.existsSync;
   const readFile = options.readFile;
@@ -153,8 +160,8 @@ function resolveRuntime(options = {}) {
     ? path.resolve(options.userData)
     : repoRoot;
   const defaultDataDir = options.isPackaged
-    ? path.join(workingDir, 'shadownet')
-    : path.join(workingDir, 'node-shadow');
+    ? path.join(workingDir, privacy.enabled ? 'shadownet-tor' : 'shadownet')
+    : path.join(workingDir, privacy.enabled ? 'node-shadow-tor' : 'node-shadow');
   const dataDir = path.resolve(env.LASER_DATADIR ||
     defaultDataDir);
   const storeVersion = readStoreVersion(dataDir, readFile);
@@ -228,7 +235,18 @@ function resolveRuntime(options = {}) {
   const peers = parsePeers(configuredPeers === undefined
     ? defaultPeers
     : configuredPeers);
+  if (privacy.error) error = privacy.error;
+  else if (privacy.enabled) {
+    if (channel !== 'v3') error = 'Tor mode requires the v3 runtime.';
+    else if (env.LASER_LISTEN && env.LASER_LISTEN !== 'none') error = 'Tor mode keeps the P2P listener off. Remove LASER_LISTEN or set it to none.';
+    else if (env.LASER_ADVERTISE) error = 'Remove LASER_ADVERTISE in Tor mode. Your node will not publish a public address.';
+    else if (env.LASER_RPC && !/^127\.0\.0\.1:([0-9]{1,5})$/.test(env.LASER_RPC)) error = 'Tor mode requires a numeric local RPC address such as 127.0.0.1:19544.';
+    else if (privacy.onionOnly && (!peers.length || peers.some(peer => !/^[a-z2-7]{56}\.onion:[0-9]{1,5}$/.test(peer)))) {
+      error = 'Onion-only mode needs explicit v3 .onion peers in LASER_PEERS. No public onion seed is configured.';
+    }
+  }
   return {
+    privacy,
     channel,
     repoRoot,
     workingDir,
@@ -241,9 +259,9 @@ function resolveRuntime(options = {}) {
     error,
     peers,
     network,
-    rpc: env.LASER_RPC || '127.0.0.1:19544',
-    listen: env.LASER_LISTEN || '127.0.0.1:19333',
-    advertise: env.LASER_ADVERTISE || null,
+    rpc: env.LASER_RPC || (privacy.enabled ? '127.0.0.1:29544' : '127.0.0.1:19544'),
+    listen: privacy.enabled ? 'none' : (env.LASER_LISTEN || '127.0.0.1:19333'),
+    advertise: privacy.enabled ? null : (env.LASER_ADVERTISE || null),
     expectedNodeVersion: channel === 'sandbox-v2' ? 'laserd 2.0.0-beta.1' : null
   };
 }

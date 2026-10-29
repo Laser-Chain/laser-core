@@ -1,10 +1,66 @@
 # Node privacy and its limits
 
-Laser Core does not currently provide an anonymous networking mode. Shadownet
+The published **v0.2.0-beta.4 binaries** do not provide a private networking mode. Shadownet
 uses direct peer connections and operating-system hostname resolution. Peers
 can observe the connecting IP address. A local P2P bind or loopback RPC address
 does not hide outbound connections. There is no supported Laser Tor/SOCKS5,
 onion-service, I2P or encrypted P2P transport setting in this release.
+
+The current source adds **experimental, opt-in outbound Tor routing** for a
+compatible v3 native runtime. It has not been issued as a new binary release or
+qualified as anonymous software. Existing downloads do not gain this feature.
+An old runtime fails startup when Tor mode is requested; there is no direct
+fallback. Do not reconfigure a running miner to test it.
+
+## Experimental source configuration
+
+For builders with a compatible native runtime advertising
+`proxy=socks5-isolated-v1`, a maintained local Tor client, and a disposable app
+profile, set `LASER_PRIVACY=tor` before launching. `LASER_TOR_PROXY` defaults to
+`127.0.0.1:9050`; `[::1]:9050` is also accepted. Use a dedicated Tor SOCKS port
+with `IsolateSOCKSAuth`. Laser does not install Tor or turn the computer into a
+relay. Only numeric loopback proxies are accepted; Laser trusts the local
+service and cannot establish that an arbitrary SOCKS service is really Tor.
+
+The source routes configured peers, the normal seed, discovered peers and
+reconnects through SOCKS5. Names are passed to the proxy, without destination
+DNS lookups on the host. The daemon requires stream-isolation authentication,
+waits for the complete CONNECT reply before sending Laser traffic, and bounds
+negotiation to 60 seconds without blocking local RPC. It closes failed attempts
+instead of connecting directly. Fresh per-connection HELLO IDs/nonces reduce
+simple identifier reuse; they do not prevent traffic correlation.
+
+P2P listening and own-address advertising are disabled. Remove
+`LASER_ADVERTISE`; leave `LASER_LISTEN` unset or use `none`. RPC must use numeric
+`127.0.0.1` (default `127.0.0.1:29544` in Tor mode). The desktop uses a separate default chain directory (`shadownet-tor`
+for packaged apps, `node-shadow-tor` for development), and native peer
+persistence uses `peers-tor.v2`. Wallets are not copied or made anonymous. Do not
+reuse an active data directory for tests. An explicit `LASER_DATADIR` is still
+honored; it is the operator's responsibility to select a disposable directory.
+
+`LASER_ONION_ONLY=1` additionally requires explicit v3 onion destinations in
+`LASER_PEERS`. No public Laser onion seed or inbound onion-service management
+is supplied. Persisted and learned clearnet peers are filtered in onion-only
+mode. Normal Tor mode can use exits; an exit can inspect and modify the
+unencrypted Laser traffic between itself and a clearnet peer. Onion destinations
+avoid that exit leg. Tor is not a post-quantum transport.
+
+Explorer publishing is disabled **before loading or migrating credentials**;
+saved settings remain intact. Attempts to change publisher settings are
+rejected in Tor mode. Chromium network requests are blocked and browser
+hostname resolution is disabled; the UI still loads bundled resources and
+uses authenticated native local RPC. These application guards are not an OS
+firewall. They do not prove that all Electron background traffic is absent.
+No updater, telemetry or crash upload is enabled by this feature.
+
+Local Windows checks cover native unit/negative tests and disposable fake-proxy
+nodes, including discovery, sync, block relay, proxy down/refusal/malformed
+replies, timeout, restart and onion-only filtering. Dedicated Linux/macOS native
+CI and the desktop platform matrix cover source behavior. Fake proxies do not
+prove real Tor circuit isolation, and mock onion names do not prove real onion
+interoperability. **Real-Tor interoperability, DNS/IPv4/IPv6 packet capture,
+deny-all-except-proxy firewall tests across every app/helper process, and
+independent review remain binary-release gates.** The mode stays experimental.
 
 Mining rewards, accounts, amounts and transaction relationships are public chain
 data. Anonymizing a future connection cannot erase earlier observations or hide
@@ -31,9 +87,10 @@ opportunistic transport encryption with distinct limits on authentication and
 active interception. Those are useful engineering references. Neither their
 existence nor an encrypted connection makes public-chain transactions anonymous.
 
-## Acceptance gates for a future private networking mode
+## Acceptance gates before claiming private operation
 
-These are planned requirements, not implemented switches or guarantees:
+These are the full acceptance requirements. The source above implements part
+of them; implementation is not evidence that every gate has passed:
 
 1. Route every outbound P2P path through one audited SOCKS5 transport: configured
    peers, seeds, learned peers, retries and reconnects. Resolve destination

@@ -63,6 +63,7 @@
       "package.json",
       "exact-json.js",
       "node-startup.js",
+      "privacy.js",
       "explorer-publisher-settings.js",
       "explorer-publisher-service.js"
     ],

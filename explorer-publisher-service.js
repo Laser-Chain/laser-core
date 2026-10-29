@@ -16,6 +16,7 @@ class PublisherService {
 
   initialize(ready) {
     this.nodeReady = ready;
+    if (this.options.privacy?.enabled) { this.restart(); return this.status(); }
     try { this.config = this.settings.load(); this.restart(); }
     catch (error) { this.configError = error.message; this.state = { ...this.state, state: 'error', error: this.configError }; }
     return this.status();
@@ -28,6 +29,7 @@ class PublisherService {
   }
 
   save(input) {
+    if (this.options.privacy?.enabled) throw new Error('Explorer publishing is unavailable in Tor mode. Saved settings have been left alone.');
     const config = this.settings.save(input, this.config);
     this.config = config;
     this.configError = null;
@@ -37,6 +39,10 @@ class PublisherService {
 
   restart() {
     this.stop();
+    if (this.options.privacy?.enabled) {
+      this.state = { state: 'disabled', privacyBlocked: true, error: 'Explorer publishing is off in Tor mode to protect your network address.', lastPublishedAt: null, lastHeight: null };
+      return;
+    }
     this.state = { state: 'unconfigured', error: null, lastPublishedAt: null, lastHeight: null };
     if (this.configError) { this.state.state = 'error'; this.state.error = this.configError; return; }
     if (!this.config) return;

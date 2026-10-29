@@ -14,6 +14,7 @@ const fs = require('fs');
 const path = require('path');
 const { parseExactJSON } = require('./exact-json');
 const { waitForRpc } = require('./node-startup');
+const { requireProxyCapability, restrictBrowserNetworking, blockWebRequests } = require('./privacy');
 const { pathToFileURL } = require('url');
 const {
   buildNodeArgs,
@@ -59,6 +60,7 @@ const runtime = resolveRuntime({
   isPackaged: app.isPackaged,
   userData: app.getPath('userData')
 });
+restrictBrowserNetworking(app, session, runtime.privacy);
 const LASERD_BIN = runtime.laserd;
 const LASER_BIN = runtime.laser;
 const LASER_SHADOW_BIN = runtime.shadow;
@@ -70,7 +72,7 @@ const LASER_DATADIR = runtime.dataDir;
 const LASER_NETWORK = runtime.network;
 const LASER_CWD = runtime.workingDir;
 const LASER_PEERS = runtime.peers;
-const LASER_SHADOW_DIR = path.join(path.dirname(LASER_DATADIR), 'shadownet-evidence');
+const LASER_SHADOW_DIR = path.join(path.dirname(LASER_DATADIR), runtime.privacy.enabled ? 'shadownet-tor-evidence' : 'shadownet-evidence');
 const LASER_SHADOW_OUTPUT = path.join(LASER_SHADOW_DIR, 'laser-shadow.jsonl');
 const LASER_APP_ICON = path.join(__dirname, 'renderer', 'logo.png');
 const LASER_RENDERER_URL = 'laser-core://app/index.html';
@@ -249,6 +251,7 @@ function startNode() {
   }
 
   try {
+    requireProxyCapability(runtime, execFileSync);
     const actualVersion = execFileSync(LASERD_BIN, ['--version'], {
       cwd: LASER_CWD,
       encoding: 'utf8',
@@ -722,6 +725,7 @@ async function waitForNodeReady() {
 }
 
 registerMainHandler('laser:startup', () => ({
+  privacy: { mode: runtime.privacy.mode, experimental: runtime.privacy.enabled },
   appVersion: app.getVersion(),
   ready: nodeReady,
   running: Boolean(laserdProcess && !hasProcessExited(laserdProcess)),
@@ -1158,6 +1162,7 @@ function createSplash() {
 }
 
 app.whenReady().then(async () => {
+  if (runtime.privacy.enabled) blockWebRequests(session.defaultSession);
   app.setAppUserModelId('org.laser.core');
   registerRendererProtocol();
   session.defaultSession.setPermissionRequestHandler(
@@ -1179,6 +1184,7 @@ app.whenReady().then(async () => {
     datadir: LASER_DATADIR,
     network: LASER_NETWORK,
     rpc: LASER_RPC,
+    privacy: runtime.privacy,
     safeStorage
   });
   explorerPublisher.initialize(nodeReady);

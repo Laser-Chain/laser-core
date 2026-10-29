@@ -576,6 +576,7 @@ class Component extends React.Component {
     else if (online && pe && pe.peers === 0) banner = { show: true, bg: '#fbf3e6', border: '#ecd4b0', fg: WARN, label: 'No peers', text: `The local node is running but not connected to other Shadownet nodes${pe.connecting ? ` · ${pe.connecting} connection attempts in progress` : ''}.`, hasDetail: false };
     else if (N.online === null && s.phase === 'main') banner = { show: true, bg: '#f4f4f1', border: '#e6e5e0', fg: SUB, label: 'Connecting', text: 'Contacting the local node…', hasDetail: false };
     if(s.walletErr && !banner.show)banner={show:true,bg:'#fbf3e6',border:'#ecd4b0',fg:WARN,label:'Wallet list unavailable',text:s.walletErr,hasDetail:false};
+    if(N.startup?.privacy?.experimental && !banner.show)banner={show:true,bg:'#fbf3e6',border:'#ecd4b0',fg:WARN,label:'Tor mode · experimental',text:'Peer connections use your local Tor proxy. Mining rewards and account activity remain public. Explorer publishing is off.',hasDetail:false};
     banner.detailOpen = banner.show && banner.hasDetail && s.showDetail;
     banner.detailLabel = s.showDetail ? 'Hide details' : 'Details';
 
