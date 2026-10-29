@@ -28,7 +28,7 @@
   "dependencies": {},
   "devDependencies": {
     "electron": "^43.1.0",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.18.0"
   },
   "build": {
     "appId": "org.laser.core",
