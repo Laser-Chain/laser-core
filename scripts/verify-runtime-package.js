@@ -30,10 +30,11 @@ async function afterPack(context) {
   }
   for (const name of asar.listPackage(archive)) {
     const relative = name.replaceAll('\\', '/').replace(/^\//, '');
-    if (asar.statFile(archive, relative).files) continue;
+    const entry = relative.split('/').join(path.sep);
+    if (asar.statFile(archive, entry).files) continue;
     if (relative === 'package.json') continue; // electron-builder normalizes metadata.
     if (!fs.existsSync(path.join(source, relative)) || fileHash(path.join(source, relative)) !==
-        require('./runtime-provenance').sha256(asar.extractFile(archive, relative))) {
+        require('./runtime-provenance').sha256(asar.extractFile(archive, entry))) {
       throw new Error('Packaged application differs from source: ' + relative);
     }
   }

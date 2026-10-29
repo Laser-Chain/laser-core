@@ -31,11 +31,11 @@ function create(app, commit) {
   const asar = require('@electron/asar');
   const archive = path.join(app, 'dist/win-unpacked/resources/app.asar');
   const files = asar.listPackage(archive).map(f => f.replaceAll('\\', '/').replace(/^\//, ''))
-    .filter(f => !asar.statFile(archive, f).files).sort();
+    .filter(f => !asar.statFile(archive, f.split('/').join(path.sep)).files).sort();
   return { format: FORMAT, desktop_commit: commit, package_lock_sha256: p.fileHash(path.join(app, 'package-lock.json')),
     node_version: process.version, electron_builder_version: require('electron-builder/package.json').version,
     app_asar_sha256: p.fileHash(archive),
-    app_files: files.map(file => ({ file, sha256: p.sha256(asar.extractFile(archive, file)) })),
+    app_files: files.map(file => ({ file, sha256: p.sha256(asar.extractFile(archive, file.split('/').join(path.sep))) })),
     components: p.verifySet(path.join(app, '.runtime')) };
 }
 
