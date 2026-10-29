@@ -55,8 +55,9 @@ No updater, telemetry or crash upload is enabled by this feature.
 
 Local Windows checks cover native unit/negative tests and disposable fake-proxy
 nodes, including discovery, sync, block relay, proxy down/refusal/malformed
-replies, timeout, restart and onion-only filtering. Dedicated Linux/macOS native
-CI and the desktop platform matrix cover source behavior. Fake proxies do not
+replies, timeout, restart and onion-only filtering. The desktop source matrix
+passes on Windows, Linux and macOS. Native Linux/macOS jobs are configured, but
+have not run successfully; their verification remains pending. Fake proxies do not
 prove real Tor circuit isolation, and mock onion names do not prove real onion
 interoperability. **Real-Tor interoperability, DNS/IPv4/IPv6 packet capture,
 deny-all-except-proxy firewall tests across every app/helper process, and
