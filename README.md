@@ -21,8 +21,8 @@ wallets, and mines to the wallet you select.
 
 ### 1. Download and verify
 
-1. Open the [Laser Core 0.2.0-beta.3 release](https://github.com/Laser-Chain/laser-core/releases/tag/v0.2.0-beta.3).
-2. Download `Laser-Core-0.2.0-beta.3-portable-x64.exe` and `SHA256SUMS`.
+1. Open the [Laser Core 0.2.0-beta.4 release](https://github.com/Laser-Chain/laser-core/releases/tag/v0.2.0-beta.4).
+2. Download `Laser-Core-0.2.0-beta.4-portable-x64.exe` and `SHA256SUMS`.
 3. In PowerShell, calculate the executable hash:
 
 ```powershell
@@ -33,6 +33,11 @@ Confirm that the result exactly matches the executable entry in
 `SHA256SUMS`. Current beta builds may be unsigned, so Windows can show a
 SmartScreen warning. Only continue after verifying the checksum from this
 repository's release page.
+
+This beta uses direct network connections. Peers can see your connecting IP,
+and mining rewards and transactions remain public. Read
+[node privacy and its limits](docs/privacy.md); this release has no supported
+Tor/I2P anonymity mode.
 
 ### 2. Run your node
 
@@ -48,11 +53,11 @@ Saved-chain verification can take several minutes. The **Node starting** banner
 shows elapsed time; keep the app open while verification completes. A slow
 startup is not treated as a failure merely because five minutes have passed.
 
-Development builds with the updated validated-state runtime perform that full
+The beta.4 validated-state runtime performs that full
 replay once, then reuse locally verified state on subsequent launches. New
 blocks are always validated. A missing or damaged cache triggers a full rebuild.
-This optimization is not included in the published beta.3 download; see the
-[unreleased notes](RELEASE_NOTES.md#unreleased-validated-state-startup-cache).
+The beta.3 download predates this optimization; see the
+[release notes](RELEASE_NOTES.md).
 
 The status bar shows peer count and chain height. Leave Laser Core running to
 remain connected and continue validating Shadownet.
@@ -217,26 +222,29 @@ With the native runtimes staged, `npm run dist:redesign` produces a local
 portable preview in `dist/redesign/`. Use the release workflow below when
 preparing a distributable release.
 
-Packaging also requires a compatible Laser node source checkout with the
-mining-intensity CLI and RPC update. Rebuild the CLI, daemon, and optional CUDA
-helper together; earlier v3 binaries do not support the new intensity argument.
-Set
-`LASER_SOURCE_DIR` to that checkout, build its Windows node binaries, prepare
-the compatibility runtime, and build the client:
+Packaging requires authorized access to compatible native and explorer source,
+MSYS2 UCRT64 GCC/Make/Bash, MSVC Build Tools and CUDA nvcc. Select committed
+source revisions in those checkouts, then build the client:
 
 ```powershell
 $env:LASER_SOURCE_DIR = 'C:\path\to\laser'
-npm run prepare:sandbox
+$env:LASER_EXPLORER_SOURCE_DIR = 'C:\path\to\laser-explorer'
+$env:LASER_NVCC = 'C:\path\to\CUDA\bin\nvcc.exe'
 npm run release:win
 ```
 
-The v3 preparation step also stages the optimized explorer helper. Keep the
-`laser-explorer` checkout beside the Laser source tree, or set
-`LASER_EXPLORER_SOURCE_DIR` to its path.
+`prepare:v3` and the compatibility `prepare:sandbox` entry point build the entire
+runtime set. Fresh Git archives isolate compilation and tests from worktree edits
+and running nodes. CUDA is compiled without running GPU work. Logs, input
+manifests and previous staged runtimes are preserved under ignored `.runtime/`.
 
-The release workflow stages exact node binaries under the ignored `.runtime/`
-directory, rejects version or hash mismatches, refuses dirty application
-source, runs the full test suite, and assembles the final directory atomically.
+Every packaging path rejects missing receipts, altered native binaries or
+unexpected runtime files. The release workflow also refuses dirty application
+source, runs the desktop tests, checks packaged bytes and assembles the final
+directory atomically. `BUILD-PROVENANCE.json` records source/tool/input/output
+identities for all seven native executables and the packaged application.
+These local records are not signed or independent reproducibility attestations.
+See [releasing](docs/releasing.md) for verification and remaining production gates.
 
 See [RELEASE_NOTES.md](RELEASE_NOTES.md),
 [SECURITY_AUDIT.md](SECURITY_AUDIT.md), [NOTICE.txt](NOTICE.txt), and

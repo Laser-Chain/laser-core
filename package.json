@@ -1,6 +1,6 @@
 {
   "name": "laser-core",
-  "version": "0.2.0-beta.3",
+  "version": "0.2.0-beta.4",
   "description": "Laser Core - Desktop wallet and mining client for Laser Shadownet",
   "author": "Lightman",
   "private": true,
@@ -20,7 +20,7 @@
     "dist:win": "electron-builder --win portable --x64",
     "release:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-release.ps1",
     "verify:release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-release.ps1",
-    "check": "node --check main.js && node --check node-startup.js && node --check explorer-publisher.js && node --check explorer-publisher-settings.js && node --check explorer-publisher-service.js && node --check scripts/verify-publisher-package.js && node --check ipc-validation.js && node --check runtime-config.js && node --check preload.js && node --check splash-preload.js && node --check renderer/app.js && node --check renderer/splash.js && node --check exact-json.js && node --check renderer/template.js",
+    "check": "node --check main.js && node --check node-startup.js && node --check explorer-publisher.js && node --check explorer-publisher-settings.js && node --check explorer-publisher-service.js && node --check scripts/verify-publisher-package.js && node --check ipc-validation.js && node --check runtime-config.js && node --check preload.js && node --check splash-preload.js && node --check renderer/app.js && node --check renderer/splash.js && node --check exact-json.js && node --check renderer/template.js && node --check scripts/runtime-provenance.js && node --check scripts/build-runtimes.js && node --check scripts/verify-runtime-package.js",
     "test": "node --test test/*.test.js && npm run check",
     "build:ui": "python scripts/build-renderer.py",
     "dist:redesign": "electron-builder --win portable --x64 -c.directories.output=dist/redesign -c.artifactName=Laser-Core-Redesign-x64.exe"
@@ -68,41 +68,35 @@
     ],
     "extraResources": [
       {
+        "from": ".runtime/v3",
+        "to": "bin/v3",
+        "filter": [
+          "laser.exe",
+          "laserd.exe",
+          "laser-shadow.exe",
+          "laser-cuda-miner.exe",
+          "BUILDINFO.txt",
+          "BUILD-PROVENANCE.json"
+        ]
+      },
+      {
         "from": ".runtime/sandbox-v2",
         "to": "bin/sandbox-v2",
         "filter": [
           "laser.exe",
           "laserd.exe",
-          "BUILDINFO.txt"
+          "BUILDINFO.txt",
+          "BUILD-PROVENANCE.json"
         ]
       },
       {
-        "from": ".runtime/v3/laser.exe",
-        "to": "bin/v3/laser.exe"
-      },
-      {
-        "from": ".runtime/v3/laserd.exe",
-        "to": "bin/v3/laserd.exe"
-      },
-      {
-        "from": ".runtime/v3/laser-shadow.exe",
-        "to": "bin/v3/laser-shadow.exe"
-      },
-      {
-        "from": ".runtime/v3",
-        "to": "bin/v3",
+        "from": ".runtime/explorer",
+        "to": "bin/explorer",
         "filter": [
-          "laser-cuda-miner.exe",
-          "BUILDINFO.txt"
+          "lxe.exe",
+          "BUILDINFO.txt",
+          "BUILD-PROVENANCE.json"
         ]
-      },
-      {
-        "from": ".runtime/explorer/lxe.exe",
-        "to": "bin/explorer/lxe.exe"
-      },
-      {
-        "from": ".runtime/explorer/BUILDINFO.txt",
-        "to": "bin/explorer/BUILDINFO.txt"
       }
     ],
     "win": {

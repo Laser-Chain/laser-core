@@ -9,10 +9,11 @@ const { beforePack, verifyArchive, verifyRuntime, MODULES } = require('../script
 
 test('every package target runs publisher checks and ships its modules, helper and identity', () => {
   const pkg = require('../package.json');
-  assert.equal(require('../' + pkg.build.beforePack), beforePack);
-  assert.equal(require('../' + pkg.build.afterPack), require('../scripts/verify-publisher-package').afterPack);
+  assert.equal(require('../' + pkg.build.beforePack), require('../scripts/verify-runtime-package').beforePack);
+  assert.equal(require('../' + pkg.build.afterPack), require('../scripts/verify-runtime-package').afterPack);
   for (const module of MODULES) assert.ok(pkg.build.files.includes(module));
-  for (const name of ['lxe.exe', 'BUILDINFO.txt']) assert.ok(pkg.build.extraResources.some(r => r.to === 'bin/explorer/' + name));
+  const explorer = pkg.build.extraResources.find(r => r.to === 'bin/explorer');
+  for (const name of ['lxe.exe', 'BUILDINFO.txt', 'BUILD-PROVENANCE.json']) assert.ok(explorer.filter.includes(name));
 });
 
 test('packaging rejects missing, tampered, or wrong-platform native helpers', t => {

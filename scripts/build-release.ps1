@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-  [switch]$AllowDirty
+  [switch]$UseVerifiedRuntimes
 )
 
 $ErrorActionPreference = 'Stop'
@@ -47,8 +47,7 @@ try {
   $status = @(& git -C $AppRepoRoot status --porcelain --untracked-files=normal)
   if ($LASTEXITCODE -ne 0) { throw 'Unable to inspect the source worktree.' }
   $dirty = $status.Count -gt 0
-  $dirtyAllowed = $AllowDirty -or $env:LASER_ALLOW_DIRTY_BUILD -eq '1'
-  if ($dirty -and -not $dirtyAllowed) {
+  if ($dirty) {
     throw 'Refusing a release candidate from a dirty worktree. Commit the reviewed changes first.'
   }
 
@@ -58,7 +57,10 @@ try {
     throw "Invalid Laser Core version: $appVersion"
   }
 
-  & (Join-Path $PSScriptRoot 'stage-v3.ps1') -SourceRoot $LaserSourceRoot
+  if (-not $UseVerifiedRuntimes) {
+    & (Join-Path $PSScriptRoot 'stage-v3.ps1') -SourceRoot $LaserSourceRoot
+  }
+  Invoke-Checked node scripts/runtime-provenance.js
   $v3Dir = Join-Path $AppDir '.runtime\v3'
   $laser = Join-Path $v3Dir 'laser.exe'
   $laserd = Join-Path $v3Dir 'laserd.exe'
@@ -131,6 +133,7 @@ try {
   Copy-Item -LiteralPath $artifact -Destination (Join-Path $candidateDir $artifactName)
   Copy-Item -LiteralPath (Join-Path $AppDir 'NOTICE.txt') -Destination $candidateDir
   Copy-Item -LiteralPath (Join-Path $AppDir 'RELEASE_NOTES.md') -Destination $candidateDir
+  Invoke-Checked node scripts/release-provenance.js create (Join-Path $candidateDir 'BUILD-PROVENANCE.json')
   $sbom = @(& npm sbom --sbom-format spdx)
   if ($LASTEXITCODE -ne 0 -or $sbom.Count -eq 0) {
     throw 'npm failed to generate the SPDX dependency inventory.'
@@ -151,7 +154,7 @@ try {
     throw 'Unable to resolve the locked Electron version.'
   }
   $buildInfo = @(
-    'format=laser-core-release-v1'
+    'format=laser-core-release-v2'
     "app_version=$appVersion"
     "source_commit=$sourceCommit"
     "source_commit_date=$sourceDate"
@@ -163,6 +166,7 @@ try {
     "laserd_version=$laserdVersion"
     "node_source_commit=$($v3Info.source_commit)"
     "node_source_dirty=$($v3Info.source_dirty)"
+    "runtime_provenance_sha256=$($v3Info.provenance_sha256)"
     "cuda_miner_sha256=$cudaMinerIdentity"
     "explorer_helper_sha256=$explorerHelperIdentity"
     'default_network=shadow'
@@ -178,6 +182,7 @@ try {
   $manifestNames = @(
     $artifactName,
     'BUILDINFO.txt',
+    'BUILD-PROVENANCE.json',
     'NOTICE.txt',
     'RELEASE_NOTES.md',
     'SBOM.spdx.json'
@@ -189,12 +194,13 @@ try {
   Set-Content -LiteralPath (Join-Path $candidateDir 'SHA256SUMS') -Value $manifest -Encoding ascii
 
   $verifyScript = Join-Path $PSScriptRoot 'verify-release.ps1'
-  if ($dirty) {
-    & $verifyScript -ReleaseDir $candidateDir -AllowDirty
-  } else {
-    & $verifyScript -ReleaseDir $candidateDir
-  }
+  & $verifyScript -ReleaseDir $candidateDir
   if ($LASTEXITCODE -ne 0) { throw 'Release verification failed.' }
+  $finalCommit = (& git -C $AppRepoRoot rev-parse HEAD | Out-String).Trim()
+  $finalStatus = @(& git -C $AppRepoRoot status --porcelain --untracked-files=normal)
+  if ($LASTEXITCODE -ne 0 -or $finalCommit -ne $sourceCommit -or $finalStatus.Count -ne 0) {
+    throw 'Application source changed during packaging. Candidate retained for inspection; do not publish.'
+  }
   Move-Item -LiteralPath $candidateDir -Destination $releaseDir
 
   Write-Host "Laser Core candidate prepared: $releaseDir"

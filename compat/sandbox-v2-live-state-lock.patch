@@ -1,5 +1,5 @@
 diff --git a/apps/cli/main.c b/apps/cli/main.c
-index c310ec0..1642dd3 100644
+index 6cdee51..85f841d 100644
 --- a/apps/cli/main.c
 +++ b/apps/cli/main.c
 @@ -30,6 +30,7 @@
@@ -10,7 +10,8 @@ index c310ec0..1642dd3 100644
  #include "net.h"
  #include "network.h"
  #include "peer.h"
-@@ -302,7 +303,15 @@ static int cmd_v2_status(int argc, char **argv, int sync_only)
+@@ -232,11 +233,19 @@ static int cmd_v2_status(int argc, char **argv, int sync_only)
+                    peers);
          return 0;
      }
 +    laser_datadir_lock_t data_lock;
@@ -27,10 +28,14 @@ index c310ec0..1642dd3 100644
 +        laser_datadir_lock_release(&data_lock);
          return 1;
 +    }
-@@ -354,5 +363,6 @@ static int cmd_v2_status(int argc, char **argv, int sync_only)
+ 
+     const laser_chain_tip_t *tip = laser_block_store_tip(&store);
+     char hash[65], work[65];
+@@ -288,6 +297,7 @@ static int cmd_v2_status(int argc, char **argv, int sync_only)
      }
      laser_tx_pool_free(&pool);
      laser_block_store_free(&store);
 +    laser_datadir_lock_release(&data_lock);
      return 0;
  }
+ 

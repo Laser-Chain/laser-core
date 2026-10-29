@@ -1,1 +1,1 @@
-module.exports = require('./verify-publisher-package').afterPack;
+module.exports = require('./verify-runtime-package').afterPack;

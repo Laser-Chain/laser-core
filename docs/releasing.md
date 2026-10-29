@@ -11,19 +11,29 @@ and native node versions are separate identities.
 2. Review dependency advisories, including packaging tools and Electron itself.
    Empty application npm dependencies do not establish that Chromium, Electron,
    native executables, or development tools are free of vulnerabilities.
-3. Obtain the compatible native source through authorized access. Record its
-   exact revision, toolchain, dirty status, binary hashes, and any patches.
-   Stage v3 and pinned compatibility runtimes using the README instructions.
-   Recheck CUDA and explorer helper identities separately.
+3. Obtain compatible native and explorer source through authorized access.
+   Set `LASER_SOURCE_DIR`, `LASER_EXPLORER_SOURCE_DIR`, and `LASER_NVCC`. Runtime
+   preparation archives the selected Git commits into isolated directories,
+   compiles every bundled executable, runs bounded native tests and records
+   input digests, compiler identities, commands, compatibility patches and
+   output hashes. Existing worktree edits and live runtime files are not inputs.
 4. On Windows x64, run `npm run release:win` from the clean desktop checkout.
    The script runs tests, verifies staged identities, packages the application,
    and assembles the release inventory. Do not use `-AllowDirty` for a public
    release. Preserve the build evidence outside tracked application source.
 
-Staging records the source checkout and hashes of supplied binaries. This does
-not independently prove those binaries were compiled from that source. Preserve
-the native build receipt as well. A source revision string is not a reproducible
-build attestation.
+`npm run prepare:v3` builds all three runtime groups, including the pinned
+sandbox and explorer. It compiles CUDA without executing GPU workloads. Retain
+the ignored `.runtime/build-*/` evidence. `release:win` normally repeats the fresh
+build; `-UseVerifiedRuntimes` reuses a previously compiled set only after checking
+all receipts and binary bytes. Every package target enforces these checks.
+
+Build receipts are generated locally, not independently signed attestations.
+Tool hashes and source manifests improve traceability; this pipeline is not
+hermetic or independently reproducible. It does not pin the entire Windows SDK,
+system libraries or CUDA installation. Authorized source access is still needed
+to reproduce private native components. Never export that source or its history
+as part of the desktop package.
 
 ## Verify the package
 
@@ -33,14 +43,21 @@ Run the strict bundle verifier on the assembled directory:
 npm run verify:release -- -ReleaseDir <candidate-directory>
 ```
 
-It checks the six-file inventory, checksums, build identity, SPDX document, and
+It checks the seven-file inventory, checksums, build identity, SPDX document, and
 Authenticode status. Inspect ASAR application files and all native resources
 against the reviewed inputs, confirm Electron fuses and credential exclusions,
 and run the packaged code on an isolated temporary profile. Check startup,
 renderer/IPC, wallet restore/unlock with disposable keys, shutdown, and native
 compatibility. Do not borrow a user's live node, wallet, RPC token, or ports.
-Record results and unresolved limitations. Have a second reviewer reproduce
-the material checks for wallet or release-boundary changes.
+Record results and unresolved limitations. Independent review and a second
+builder remain qualification gates for a production release; an unsigned
+experimental prerelease must explicitly record when these are outstanding.
+
+Release format v2 adds `BUILD-PROVENANCE.json`: all component receipts, the
+application archive digest, each packaged application file's digest and the
+lockfile digest. `NOTICE.txt` includes the native dependency license texts.
+The SPDX file describes npm dependencies; it is not a complete native/OS SBOM.
+Use the verifier from the matching tag for older six-file format-v1 releases.
 
 ## Authenticate and publish
 

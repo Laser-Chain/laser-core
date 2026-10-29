@@ -31,7 +31,7 @@ test('public package excludes development HTTP and external explorer surfaces', 
 });
 
 test('release provenance covers the optional CUDA runtime', () => {
-  const stage = read('scripts/stage-v3.ps1');
+  const stage = read('scripts/build-runtimes.js');
   const build = read('scripts/build-release.ps1');
   const verify = read('scripts/verify-release.ps1');
   assert.match(stage, /laser_cuda_miner_sha256=/);

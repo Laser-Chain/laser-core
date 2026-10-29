@@ -3,6 +3,10 @@
 Laser Core is experimental Shadownet software and must not hold assets of
 value.
 
+Node connectivity is currently address-visible. Read [privacy and its
+limits](docs/privacy.md) before assuming encrypted wallets or post-quantum
+signatures provide network anonymity.
+
 Please report suspected remote-code-execution, wallet-secret, consensus, or
 network-isolation vulnerabilities privately through GitHub Security Advisories
 for this repository using [Report a vulnerability](https://github.com/Laser-Chain/laser-core/security/advisories/new).

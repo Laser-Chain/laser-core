@@ -1,6 +1,12 @@
 # Laser Core release notes
 
-## Unreleased: wallet restore and dependency maintenance
+## 0.2.0-beta.4: wallet recovery, validated startup and traceable builds (2026-10-28)
+
+- Compile all seven native executables from isolated, committed source snapshots.
+  Record input digests, compatibility patches, tool hashes, build commands and
+  output hashes; reject missing or mismatched receipts before and after packaging.
+- Ship `BUILD-PROVENANCE.json`, a packaged application inventory, full native
+  dependency license texts, SPDX npm inventory and SHA-256 checksums.
 
 - Bound wallet backup reads before allocation, reject unsupported key profiles
   and KDF parameters, and restore the exact bytes that passed structural checks.
@@ -9,14 +15,11 @@
   authentication and keypair validation occur when unlocking in the native CLI.
 - Update the locked Electron runtime to 43.8.4 and refresh compatible packaging
   dependencies to resolve known advisories. Existing downloads retain their
-  original Electron runtime until a new binary release is published.
+  original Electron runtime. This package uses Electron 43.8.4.
 - Check desktop behavior and generated assets on Linux, Windows, and macOS,
   with Node 22/24 coverage and a full locked-dependency audit.
 
-These source changes do not update the published beta.3 executable. Native
-runtime packaging remains Windows x64 only.
-
-## Unreleased: validated-state startup cache
+Native runtime packaging remains Windows x64 only.
 
 - Resume the native daemon from locally validated account state and rebuild
   its header index without repeating historical proof-of-work verification.
@@ -29,9 +32,27 @@ runtime packaging remains Windows x64 only.
   forces a complete rebuild. Core's existing startup banner stays available
   while first-run validation completes.
 
-This requires the matching updated native runtime. The published beta.3
-download predates this change. Consensus, wallets and block-store format are
+The matching native runtime is included. The beta.3 download predates this
+change. Consensus, wallets and block-store format are
 unchanged; cache files are local acceleration data, not network checkpoints.
+
+The node engine remains 3.0.0-beta.2; active consensus remains PhotonHash v0.2.2.
+Native wallet input allocation is also bounded before parsing. This is an
+unsigned experimental Shadownet prerelease; its coins have no monetary value.
+Local receipts are not signed attestations. Independent release reproduction,
+external security review and an authenticated signing identity remain outstanding
+production gates. The npm SPDX inventory is not a complete native/OS SBOM.
+
+Upgrading requires a deliberate app restart. Back up wallet files first and
+close the old app cleanly before opening the new one. Do not run two writers on
+the same data directory. First upgraded startup replays saved history; later
+starts can use the local cache. Previous releases remain available. A downgrade
+can ignore the additive cache; never delete the chain or wallet to speed startup.
+
+This version does not add anonymous networking. Direct peers still observe the
+connecting IP and chain activity remains public. Read [privacy](docs/privacy.md)
+for the boundary and planned acceptance gates. No privacy configuration or live
+network migration is performed by the build/release tooling.
 
 ## 0.2.0-beta.3: startup recovery and desktop operations (2026-10-28)
 

@@ -12,8 +12,8 @@ $directories = @(Get-ChildItem -LiteralPath $directory -Force -Directory)
 if ($directories.Count -ne 0) {
   throw 'Release directory must not contain subdirectories.'
 }
-if ($files.Count -ne 6) {
-  throw 'Release directory must contain exactly the executable, BUILDINFO.txt, NOTICE.txt, RELEASE_NOTES.md, SBOM.spdx.json, and SHA256SUMS.'
+if ($files.Count -ne 7) {
+  throw 'Release directory must contain exactly the executable, BUILDINFO.txt, BUILD-PROVENANCE.json, NOTICE.txt, RELEASE_NOTES.md, SBOM.spdx.json, and SHA256SUMS.'
 }
 foreach ($file in $files) {
   if (($file.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
@@ -23,7 +23,7 @@ foreach ($file in $files) {
 
 $executables = @($files | Where-Object Name -match '^Laser-Core-[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?-portable-x64\.exe$')
 if ($executables.Count -ne 1) { throw 'Release directory must contain exactly one canonical portable executable.' }
-$expectedNames = @($executables[0].Name, 'BUILDINFO.txt', 'NOTICE.txt', 'RELEASE_NOTES.md', 'SBOM.spdx.json', 'SHA256SUMS')
+$expectedNames = @($executables[0].Name, 'BUILDINFO.txt', 'BUILD-PROVENANCE.json', 'NOTICE.txt', 'RELEASE_NOTES.md', 'SBOM.spdx.json', 'SHA256SUMS')
 $actualNames = @($files.Name | Sort-Object)
 $expectedNameList = ($expectedNames | Sort-Object) -join "`n"
 $actualNameList = $actualNames -join "`n"
@@ -33,7 +33,7 @@ if ($expectedNameList -ne $actualNameList) {
 
 $manifestPath = Join-Path $directory 'SHA256SUMS'
 $manifestLines = @(Get-Content -LiteralPath $manifestPath -Encoding ascii)
-if ($manifestLines.Count -ne 5) { throw 'SHA256SUMS must contain exactly five entries.' }
+if ($manifestLines.Count -ne 6) { throw 'SHA256SUMS must contain exactly six entries.' }
 $seen = @{}
 foreach ($line in $manifestLines) {
   if ($line -notmatch '^([0-9a-f]{64})  ([A-Za-z0-9._-]+)$') {
@@ -50,7 +50,7 @@ foreach ($line in $manifestLines) {
   if ($actual -ne $digest) { throw "Checksum mismatch: $name" }
   $seen[$name] = $true
 }
-foreach ($name in @($executables[0].Name, 'BUILDINFO.txt', 'NOTICE.txt', 'RELEASE_NOTES.md', 'SBOM.spdx.json')) {
+foreach ($name in @($executables[0].Name, 'BUILDINFO.txt', 'BUILD-PROVENANCE.json', 'NOTICE.txt', 'RELEASE_NOTES.md', 'SBOM.spdx.json')) {
   if (-not $seen.ContainsKey($name)) { throw "Missing checksum entry: $name" }
 }
 
@@ -75,7 +75,7 @@ foreach ($key in $requiredKeys) {
     throw "Missing build identity field: $key"
   }
 }
-if ($buildInfo.format -ne 'laser-core-release-v1' -or
+if ($buildInfo.format -ne 'laser-core-release-v2' -or
     $buildInfo.platform -ne 'windows-x64' -or
     $buildInfo.package_target -ne 'portable' -or
     $buildInfo.project_license -ne 'UNLICENSED') {
@@ -97,6 +97,10 @@ if ($buildInfo.source_dirty -eq 'true' -and -not $AllowDirty) {
 if ($buildInfo.source_dirty -notin @('true', 'false')) {
   throw 'Invalid source_dirty value.'
 }
+if ($buildInfo.source_commit -notmatch '^[0-9a-f]{40}$' -or $buildInfo.node_source_commit -notmatch '^[0-9a-f]{40}$' -or
+    $buildInfo.node_source_dirty -ne 'false') { throw 'Invalid clean source identity.' }
+& node (Join-Path $PSScriptRoot 'release-provenance.js') verify $directory
+if ($LASTEXITCODE -ne 0) { throw 'Release provenance verification failed.' }
 
 $signature = Get-AuthenticodeSignature -LiteralPath $executables[0].FullName
 if ([string]$signature.Status -ne $buildInfo.authenticode_status) {
