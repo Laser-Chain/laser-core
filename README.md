@@ -132,9 +132,9 @@ Default Windows locations are:
 
 | Data | Location |
 | --- | --- |
-| Shadownet chain | `%APPDATA%\Laser Core\shadownet` |
-| Encrypted wallets | `%APPDATA%\Laser Core\wallets` |
-| Shadow evidence | `%APPDATA%\Laser Core\shadownet-evidence` |
+| Shadownet chain | `%APPDATA%\laser-core\shadownet` |
+| Encrypted wallets | `%APPDATA%\laser-core\wallets` |
+| Shadow evidence | `%APPDATA%\laser-core\shadownet-evidence` |
 
 Back up wallets before deleting application data. Never share wallet `.key`
 files, passphrases, or RPC tokens.
@@ -184,6 +184,10 @@ npm run verify:release -- -ReleaseDir <release-directory>
 ```
 
 ## Development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for source checks, component boundaries,
+and review guidance, and [docs/releasing.md](docs/releasing.md) for release
+verification and signing requirements.
 
 The 0.2.0-beta.2 release includes the redesigned native Electron interface, with
 Overview, Send, Receive, Mining, and Network views. It uses the existing

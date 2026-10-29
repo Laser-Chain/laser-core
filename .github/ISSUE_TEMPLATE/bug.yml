@@ -1,0 +1,33 @@
+name: Bug report
+description: Report a reproducible Laser Core problem.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Report security vulnerabilities privately at https://github.com/Laser-Chain/laser-core/security/advisories/new.
+        Never attach wallet files, passphrases, RPC tokens, publisher settings, or unredacted logs.
+  - type: input
+    id: version
+    attributes:
+      label: Laser Core version and download source
+      placeholder: 0.2.0-beta.3 from the GitHub release
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system and architecture
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include expected behavior and what actually happened.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Redacted diagnostics
+      description: Include relevant error text, native node version and channel, and whether this is a fresh profile or upgrade. Remove private paths and secrets.

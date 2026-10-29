@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability privately
+    url: https://github.com/Laser-Chain/laser-core/security/advisories/new
+    about: Keep exploit details and wallet or credential exposure out of public issues.

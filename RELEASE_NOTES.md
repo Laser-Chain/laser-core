@@ -1,5 +1,21 @@
 # Laser Core release notes
 
+## Unreleased: wallet restore and dependency maintenance
+
+- Bound wallet backup reads before allocation, reject unsupported key profiles
+  and KDF parameters, and restore the exact bytes that passed structural checks.
+- Preserve existing wallet files, flush new restores, and remove incomplete
+  destinations if writing or flushing fails. Restored wallets remain locked;
+  authentication and keypair validation occur when unlocking in the native CLI.
+- Update the locked Electron runtime to 43.8.4 and refresh compatible packaging
+  dependencies to resolve known advisories. Existing downloads retain their
+  original Electron runtime until a new binary release is published.
+- Check desktop behavior and generated assets on Linux, Windows, and macOS,
+  with Node 22/24 coverage and a full locked-dependency audit.
+
+These source changes do not update the published beta.3 executable. Native
+runtime packaging remains Windows x64 only.
+
 ## Unreleased: validated-state startup cache
 
 - Resume the native daemon from locally validated account state and rebuild
